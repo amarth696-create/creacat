@@ -6,21 +6,43 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def _get_api_key(key_name: str, default: str = "") -> str:
-    val = os.getenv(key_name, "")
-    if not val:
-        try:
-            import streamlit as st
-            val = st.secrets.get(key_name, "")
-        except Exception:
-            pass
-    return val or default
+    # 1. Environment variables (büyük veya küçük harf)
+    val = os.getenv(key_name, "") or os.getenv(key_name.lower(), "")
+    if val:
+        return val
+        
+    # 2. Streamlit secrets
+    try:
+        import streamlit as st
+        # Doğrudan anahtar
+        if key_name in st.secrets:
+            return str(st.secrets[key_name])
+        if key_name.lower() in st.secrets:
+            return str(st.secrets[key_name.lower()])
+            
+        # Alt bölümleri (sections) tara
+        for section_key, section_val in st.secrets.items():
+            if isinstance(section_val, dict):
+                if key_name in section_val:
+                    return str(section_val[key_name])
+                if key_name.lower() in section_val:
+                    return str(section_val[key_name.lower()])
+    except Exception:
+        pass
+        
+    return default
 
-class Config:
+class ConfigMeta(type):
+    @property
+    def YOUTUBE_API_KEY(cls) -> str:
+        return _get_api_key('YOUTUBE_API_KEY')
+        
+    @property
+    def GEMINI_API_KEY(cls) -> str:
+        return _get_api_key('GEMINI_API_KEY')
+
+class Config(metaclass=ConfigMeta):
     """Uygulama konfigürasyon sınıfı."""
-    
-    # API Keys
-    YOUTUBE_API_KEY = _get_api_key('YOUTUBE_API_KEY')
-    GEMINI_API_KEY = _get_api_key('GEMINI_API_KEY')
     
     # Varsayılan Değerler
     DEFAULT_DEPTH = 1

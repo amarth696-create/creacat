@@ -77,6 +77,31 @@ def render_sidebar() -> Dict[str, Any]:
             st.sidebar.caption("Henüz kayıtlı arama yok.")
     except Exception:
         st.sidebar.caption("Arama geçmişi yüklenemedi.")
+
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("🔑 API Durumu")
+    import os
+    from config import Config
+    gemini_key = getattr(Config, 'GEMINI_API_KEY', '') or os.getenv('GEMINI_API_KEY', '')
+    youtube_key = getattr(Config, 'YOUTUBE_API_KEY', '') or os.getenv('YOUTUBE_API_KEY', '')
+    
+    if gemini_key:
+        st.sidebar.success("🤖 Gemini API: Aktif ✅")
+    else:
+        st.sidebar.warning("⚠️ Gemini API: Eksik")
+        manual_gemini = st.sidebar.text_input("Gemini API Key Girin:", type="password", key="manual_gemini")
+        if manual_gemini:
+            os.environ["GEMINI_API_KEY"] = manual_gemini
+            st.rerun()
+            
+    if youtube_key:
+        st.sidebar.success("▶️ YouTube API: Aktif ✅")
+    else:
+        st.sidebar.info("▶️ YouTube API: Eksik (Opsiyonel)")
+        manual_yt = st.sidebar.text_input("YouTube API Key Girin:", type="password", key="manual_yt")
+        if manual_yt:
+            os.environ["YOUTUBE_API_KEY"] = manual_yt
+            st.rerun()
     
     return {
         "platforms": platforms,
