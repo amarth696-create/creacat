@@ -3,7 +3,13 @@ import subprocess
 import json
 from typing import List, Dict, Any
 from bs4 import BeautifulSoup
-from playwright.async_api import async_playwright
+
+try:
+    from playwright.async_api import async_playwright
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    PLAYWRIGHT_AVAILABLE = False
+    async_playwright = None
 
 from searchers.base import BaseSearcher
 from models.creator import Creator
@@ -33,6 +39,9 @@ class TikTokSearcher(BaseSearcher):
         return asyncio.run(self._async_ara(keyword, filters))
         
     async def _async_ara(self, keyword: str, filters: Dict[str, Any]) -> List[Creator]:
+        if not PLAYWRIGHT_AVAILABLE:
+            self.logger.warning("Playwright kütüphanesi kurulu değil, TikTok taraması atlanıyor.")
+            return []
         creators = []
         try:
             self.logger.info(f"TikTok üzerinde '{keyword}' için Playwright ile arama başlatılıyor...")

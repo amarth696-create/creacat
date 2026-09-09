@@ -1,9 +1,21 @@
 import collections
 from typing import List
 
-from sklearn.feature_extraction.text import TfidfVectorizer
-import nltk
-from langdetect import detect, LangDetectException
+try:
+    from sklearn.feature_extraction.text import TfidfVectorizer
+except ImportError:
+    TfidfVectorizer = None
+
+try:
+    import nltk
+except ImportError:
+    nltk = None
+
+try:
+    from langdetect import detect, LangDetectException
+except ImportError:
+    detect = None
+    LangDetectException = Exception
 
 from analyzers.base_analyzer import BaseAnalyzer
 from models.creator import Creator
@@ -49,32 +61,35 @@ class TextAnalyzer(BaseAnalyzer):
 
         # c. TF-IDF
         main_topics = []
-        try:
-            vectorizer = TfidfVectorizer(max_features=10, stop_words='english')
-            vectorizer.fit_transform([combined_text])
-            feature_names = vectorizer.get_feature_names_out()
-            main_topics = list(feature_names)
-        except Exception as e:
-            self.logger.error(f"TF-IDF hatası: {e}")
+        if TfidfVectorizer is not None:
+            try:
+                vectorizer = TfidfVectorizer(max_features=10, stop_words='english')
+                vectorizer.fit_transform([combined_text])
+                feature_names = vectorizer.get_feature_names_out()
+                main_topics = list(feature_names)
+            except Exception as e:
+                self.logger.debug(f"TF-IDF hatası: {e}")
 
         # d. N-gram analysis
-        try:
-            tokens = nltk.word_tokenize(combined_text)
-            bigrams = nltk.ngrams(tokens, 2)
-            trigrams = nltk.ngrams(tokens, 3)
-            # Not fully utilized but parsed as requested
-        except Exception as e:
-            self.logger.error(f"N-gram hatası: {e}")
+        if nltk is not None:
+            try:
+                tokens = nltk.word_tokenize(combined_text)
+                bigrams = nltk.ngrams(tokens, 2)
+                trigrams = nltk.ngrams(tokens, 3)
+            except Exception as e:
+                self.logger.debug(f"N-gram hatası: {e}")
 
         # e. Hashtag clustering
         hashtag_counts = collections.Counter(hashtags)
         top_hashtags = [hashtag for hashtag, count in hashtag_counts.most_common(10)]
 
         # f. Language detection
-        try:
-            detected_lang = detect(combined_text)
-        except LangDetectException:
-            detected_lang = "unknown"
+        detected_lang = "tr"
+        if detect is not None:
+            try:
+                detected_lang = detect(combined_text)
+            except Exception:
+                detected_lang = "tr"
 
         # g. Content consistency
         consistency = 0.8 if main_topics else 0.5

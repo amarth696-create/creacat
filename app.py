@@ -1,5 +1,6 @@
 import streamlit as st
 import time
+from typing import List, Dict, Any, Optional
 from config import Config
 from ui.state import init_session_state, get_state, set_state
 from ui.sidebar import render_sidebar
@@ -31,6 +32,47 @@ st.set_page_config(
     page_icon="🔍",
     layout="wide"
 )
+
+def balance_by_platform(creators: List[Creator], requested_platforms: List[str], limit: int = 30) -> List[Creator]:
+    """
+    Seçilen platformlar arasında homojen ve dengeli dağılım sağlar (Round-Robin).
+    Böylece hiçbir platform (örneğin YouTube) diğer platformları (Instagram, TikTok) listeden eleyemez.
+    """
+    if not requested_platforms or len(requested_platforms) <= 1:
+        return creators[:limit]
+        
+    plat_groups = {p.lower(): [] for p in requested_platforms}
+    others = []
+    
+    for c in creators:
+        p_name = str(getattr(c, 'platform', '')).lower()
+        matched = False
+        for p_key in plat_groups:
+            if p_key in p_name:
+                plat_groups[p_key].append(c)
+                matched = True
+                break
+        if not matched:
+            others.append(c)
+            
+    # Round-Robin sırayla her platformdan birer üretici seç
+    balanced = []
+    active_keys = [k for k in plat_groups if plat_groups[k]]
+    idx = 0
+    while len(balanced) < limit and active_keys:
+        still_active = []
+        for k in active_keys:
+            if idx < len(plat_groups[k]):
+                balanced.append(plat_groups[k][idx])
+                if idx + 1 < len(plat_groups[k]):
+                    still_active.append(k)
+        active_keys = still_active
+        idx += 1
+        
+    if len(balanced) < limit and others:
+        balanced.extend(others[:limit - len(balanced)])
+        
+    return balanced[:limit]
 
 def execute_search(params, settings):
     """Gerçek arama motorunu ve otomatik türetilen ilişkili anahtar kelimeleri çalıştırır."""
@@ -152,7 +194,8 @@ def execute_search(params, settings):
     # Puanlama & sıralama
     scored = scorer.score(analyzed, keyword=keyword)
     sorted_creators = sorted(scored, key=lambda c: getattr(c, "final_score", 0.0) or 0.0, reverse=True)
-    final_creators = sorted_creators[:Config.DEFAULT_LIMIT]
+    # Seçilen platformlar arasında eşit ve homojen dağılım sağla (YouTube, Instagram, TikTok dengesi)
+    final_creators = balance_by_platform(sorted_creators, raw_platforms, limit=Config.DEFAULT_LIMIT)
     
     # SQLite'a oturumu kaydet
     try:

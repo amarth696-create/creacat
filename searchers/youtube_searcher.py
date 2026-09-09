@@ -1,6 +1,13 @@
 from typing import List, Dict, Any
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
+
+try:
+    from googleapiclient.discovery import build
+    from googleapiclient.errors import HttpError
+    GOOGLE_API_AVAILABLE = True
+except ImportError:
+    GOOGLE_API_AVAILABLE = False
+    build = None
+    HttpError = Exception
 
 from searchers.base import BaseSearcher
 from models.creator import Creator

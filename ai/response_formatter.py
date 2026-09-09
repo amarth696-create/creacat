@@ -37,8 +37,11 @@ def format_search_results(creators: List[Any], keyword: str, hashtags: List[str]
         # Son incelenen somut içerikler / videolar
         recent = getattr(c, "recent_contents", []) or (getattr(ca, "ana_konular", []) if ca else [])
         
+        plat_lower = plat_str.lower()
+        badge = "🔴 YouTube" if "youtube" in plat_lower else ("🟣 Instagram" if "instagram" in plat_lower else ("⚫ TikTok" if "tiktok" in plat_lower else plat_str))
+        
         link = f"[{username}]({url})" if url != "#" else f"**@{username}**"
-        lines.append(f"{i}. 👤 **{link}** — *{plat_str}*")
+        lines.append(f"{i}. 👤 **{link}** — **{badge}**")
         lines.append(f"   • 👥 **Takipçi:** {followers:,} | 📈 **Etkileşim:** %{eng:.2f} | ⭐ **Uygunluk Skoru:** {score:.1f}/100 | 🟢 **Herkese Açık**")
         
         if bio:
