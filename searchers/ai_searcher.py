@@ -1,8 +1,7 @@
-﻿import json
+import json
 import logging
 from typing import List, Dict, Any, Optional
 from models.creator import Creator
-from models.platform import Platform
 from searchers.base import BaseSearcher
 
 logger = logging.getLogger(__name__)
@@ -144,20 +143,18 @@ SADECE aşağıdaki JSON formatında geçerli bir JSON listesi döndür. Kesinli
                 
             for item in data:
                 plat_str = str(item.get("platform", "YouTube")).capitalize()
-                try:
-                    p_enum = Platform[plat_str.upper()]
-                except Exception:
-                    p_enum = Platform.YOUTUBE
-                    
+                u_name = str(item.get("username", "Bilinmeyen"))
+                d_name = str(item.get("display_name") or u_name)
                 followers = int(item.get("followers", 0) or 0)
                 eng_rate = float(item.get("engagement_rate", 0.0) or 0.0)
-                url = item.get("profile_url") or f"https://www.google.com/search?q={item.get('username')}"
+                url = item.get("profile_url") or f"https://www.google.com/search?q={u_name}"
                 
                 c = Creator(
-                    username=item.get("username", "Bilinmeyen"),
-                    platform=p_enum,
-                    followers=followers,
+                    username=u_name,
+                    display_name=d_name,
+                    platform=plat_str,
                     profile_url=url,
+                    followers=followers,
                     bio=item.get("bio", ""),
                     country="Türkiye",
                     language="Türkçe"
