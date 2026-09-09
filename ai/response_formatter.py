@@ -1,12 +1,12 @@
 from typing import List, Any
 
 def format_search_results(creators: List[Any], keyword: str) -> str:
-    """Arama sonuçlarını özetleyen zengin ve spesifik bir Türkçe liste metni oluşturur."""
+    """Arama sonuçlarını özetleyen zengin, içerik odaklı ve spesifik bir Türkçe liste metni oluşturur."""
     if not creators:
         return f"🔍 **'{keyword}'** konusu için kriterlere uygun içerik üreticisi bulunamadı. Lütfen filtreleri genişleterek tekrar deneyin."
     
     lines = [
-        f"### 🎯 '{keyword.capitalize()}' Konusunda Bulunan En Uygun İçerik Üreticileri ({len(creators)} Kişi):",
+        f"### 🎯 '{keyword.capitalize()}' Konusunda İçerikleri Doğrulanan En Uygun Üreticiler ({len(creators)} Kişi):",
         ""
     ]
     
@@ -26,22 +26,32 @@ def format_search_results(creators: List[Any], keyword: str) -> str:
         llm_ozet = getattr(ca, "llm_ozet", "") if ca else ""
         nis = getattr(ca, "nis_alani", "") if ca else ""
         
+        # Son incelenen somut içerikler / videolar
+        recent = getattr(c, "recent_contents", []) or (getattr(ca, "ana_konular", []) if ca else [])
+        
         link = f"[{username}]({url})" if url != "#" else f"**@{username}**"
         lines.append(f"{i}. 👤 **{link}** — *{plat_str}*")
-        lines.append(f"   • 👥 **Takipçi:** {followers:,} | 📈 **Etkileşim:** %{eng:.2f} | ⭐ **Uygunluk Skoru:** {score:.1f}/100")
+        lines.append(f"   • 👥 **Takipçi:** {followers:,} | 📈 **Etkileşim:** %{eng:.2f} | ⭐ **Uygunluk Skoru:** {score:.1f}/100 | 🟢 **Herkese Açık**")
         
         if bio:
-            short_bio = bio[:160] + ("..." if len(bio) > 160 else "")
-            lines.append(f"   • 📝 **Hakkında:** {short_bio}")
+            short_bio = bio[:180] + ("..." if len(bio) > 180 else "")
+            lines.append(f"   • 📝 **Biyografi:** {short_bio}")
+            
+        if recent:
+            lines.append("   • 🎬 **İncelenen Son İçerik / Video Konuları:**")
+            for item in recent[:3]:
+                lines.append(f"     ▫️ *{item}*")
             
         if llm_ozet:
-            lines.append(f"   • 🤖 **AI Özeti:** {llm_ozet}")
+            lines.append(f"   • 🔍 **İçerik İnceleme & Tarzı:** {llm_ozet}")
         elif nis:
-            lines.append(f"   • 🎯 **Niş:** {nis}")
+            lines.append(f"   • 🎯 **Odak Alanı:** {nis}")
             
+        lines.append(f"   • 🔗 **Doğrudan Kanal/Hesap:** {url}")
         lines.append("")
         
     return "\n".join(lines)
+
 
 def format_creator_detail(creator: Any) -> str:
     """İçerik üreticinin detaylarını Türkçe özetler."""

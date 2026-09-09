@@ -60,10 +60,15 @@ class Filterer:
 
     def _meets_criteria(self, creator: Creator, filters: dict) -> bool:
         """İçerik üreticisinin tüm filtrelere uyup uymadığını kontrol eder."""
+        # Gizli (private) hesapları ASLA kabul etme
+        if getattr(creator, 'is_private', False):
+            return False
+            
         if not filters:
             return True
             
         followers = getattr(creator, 'followers', 0)
+
         
         if 'min_followers' in filters and filters['min_followers'] is not None and filters['min_followers'] > 0:
             if followers < filters['min_followers']:

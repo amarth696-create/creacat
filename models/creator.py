@@ -50,9 +50,11 @@ class Creator:
     engagement_rate: float = 0.0
     content_analysis: Optional[ContentAnalysis] = None
     final_score: float = 0.0
-    search_keyword: str = ""
+    recent_contents: List[str] = field(default_factory=list)
+    is_private: bool = False
     scraped_at: datetime = field(default_factory=datetime.now)
     analysis_depth: int = 1
+
 
     def to_dict(self) -> Dict[str, Any]:
         """Sınıfı sözlüğe dönüştürür."""

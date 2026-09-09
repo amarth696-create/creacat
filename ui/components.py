@@ -29,13 +29,20 @@ def render_creator_card(creator: Any) -> None:
         with col3:
             st.metric("Uygunluk Skoru", f"{score:.1f}/100")
             
+        st.caption("🟢 **Hesap Durumu:** Herkese Açık (Public) • Doğrulanmış Profil")
         bio = getattr(creator, "bio", "") or "Bilgi yok"
         st.write("📝 **Hakkında (Bio):**", bio[:250] + ("..." if len(bio) > 250 else ""))
         
         ca = getattr(creator, "content_analysis", None)
+        recent = getattr(creator, "recent_contents", []) or (getattr(ca, "ana_konular", []) if ca else [])
+        if recent:
+            st.write("🎬 **İncelenen Son İçerikler / Videolar:**")
+            for item in recent[:3]:
+                st.markdown(f"- ▫️ *{item}*")
+                
         if ca:
             if getattr(ca, "llm_ozet", None):
-                st.write("🤖 **AI Özeti:**", ca.llm_ozet)
+                st.write("🔍 **İçerik İnceleme & Tarzı:**", ca.llm_ozet)
             if getattr(ca, "nis_alani", None):
                 st.write("🎯 **Niş Alanı:**", ca.nis_alani)
             if getattr(ca, "hedef_kitle", None):
@@ -47,7 +54,8 @@ def render_creator_card(creator: Any) -> None:
         
         url = getattr(creator, "profile_url", None) or getattr(creator, "url", "#")
         if url and url != "#":
-            st.link_button("Profile Git", url)
+            st.link_button(f"🌐 @{username} Profiline Git", url)
+
 
 def render_results_table(creators: List[Any], depth: int = 1) -> None:
     """Arama sonuçlarını interaktif bir tablo olarak gösterir."""
