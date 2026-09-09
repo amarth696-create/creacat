@@ -49,11 +49,16 @@ class LlmAnalyzer(BaseAnalyzer):
             if self.provider == 'gemini':
                 import google.genai as genai
                 client = genai.Client(api_key=self.api_key)
-                response = client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=prompt,
-                )
-                result_text = response.text
+                for m in ['gemini-3.6-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']:
+                    try:
+                        response = client.models.generate_content(
+                            model=m,
+                            contents=prompt,
+                        )
+                        result_text = response.text
+                        break
+                    except Exception:
+                        continue
                 
             elif self.provider == 'ollama':
                 url = "http://localhost:11434/api/generate"

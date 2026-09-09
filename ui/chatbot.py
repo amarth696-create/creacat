@@ -18,21 +18,28 @@ import json
 class ChatBot:
     """Yapay Zeka Sohbet Botu."""
     
+    CANDIDATE_MODELS = ['gemini-3.6-flash', 'gemini-2.0-flash', 'gemini-1.5-flash']
+
     def __init__(self, gemini_api_key: str):
         self.model = None
         self.client = None
         self.api_key = gemini_api_key or ""
         
         if self.api_key:
-            if HAS_LEGACY_GENAI and genai:
-                try:
-                    genai.configure(api_key=self.api_key)
-                    self.model = genai.GenerativeModel('gemini-2.5-flash')
-                except Exception:
-                    pass
-            elif HAS_NEW_GENAI and new_genai:
+            if HAS_NEW_GENAI and new_genai:
                 try:
                     self.client = new_genai.Client(api_key=self.api_key)
+                except Exception:
+                    pass
+            if not self.client and HAS_LEGACY_GENAI and genai:
+                try:
+                    genai.configure(api_key=self.api_key)
+                    for m in self.CANDIDATE_MODELS:
+                        try:
+                            self.model = genai.GenerativeModel(m)
+                            break
+                        except Exception:
+                            continue
                 except Exception:
                     pass
         
@@ -59,23 +66,34 @@ Eğer kullanıcı arama yapmak istiyorsa JSON formatında parametreleri dön."""
                     "params": {}
                 }
             else:
-                if self.model:
-                    response = self.model.generate_content(prompt)
-                    return {
-                        "text": response.text,
-                        "action": None,
-                        "params": None
-                    }
-                elif self.client:
-                    response = self.client.models.generate_content(
-                        model='gemini-2.5-flash',
-                        contents=prompt
-                    )
-                    return {
-                        "text": response.text,
-                        "action": None,
-                        "params": None
-                    }
+                if self.client:
+                    for m in self.CANDIDATE_MODELS:
+                        try:
+                            response = self.client.models.generate_content(
+                                model=m,
+                                contents=prompt
+                            )
+                            return {
+                                "text": response.text,
+                                "action": None,
+                                "params": None
+                            }
+                        except Exception:
+                            continue
+                elif self.model:
+                    try:
+                        response = self.model.generate_content(prompt)
+                        return {
+                            "text": response.text,
+                            "action": None,
+                            "params": None
+                        }
+                    except Exception as e:
+                        return {
+                            "text": f"Model yanıt veremedi: {str(e)}",
+                            "action": None,
+                            "params": None
+                        }
                 return {
                     "text": "API anahtarı bulunamadı veya model başlatılamadı.",
                     "action": None,
