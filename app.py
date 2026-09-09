@@ -16,6 +16,7 @@ from searchers.youtube_searcher import YouTubeSearcher
 from searchers.tiktok_searcher import TikTokSearcher
 from searchers.instagram_searcher import InstagramSearcher
 from searchers.ai_searcher import AISearcher
+from searchers.live_searcher import LiveSearcher
 from searchers.google_enricher import GoogleEnricher
 from processors.normalizer import Normalizer
 from processors.scorer import Scorer
@@ -75,7 +76,23 @@ def execute_search(params, settings):
     
     raw_results = []
     
-    # Platformlarda Ana Kelime ve Türetilen En İlgili Kelimeler ile Çoklu Tarama
+    # 1. CANLI VE AKTİF WEB TARAMASI (API anahtarsız gerçek zamanlı canlı platform kazıma)
+    try:
+        live_searcher = LiveSearcher()
+        live_results = live_searcher.search(
+            query=keyword,
+            limit=Config.DEFAULT_LIMIT,
+            filters={
+                "min_followers": min_followers,
+                "max_followers": max_followers,
+                "platforms": raw_platforms
+            }
+        )
+        raw_results.extend(live_results)
+    except Exception as e:
+        pass
+
+    # 2. Platformlarda Ana Kelime ve Türetilen En İlgili Kelimeler ile Çoklu Tarama
     terms_to_search = [keyword] + [k for k in related_keywords[:3] if k.lower() != keyword.lower()]
     for term in terms_to_search:
         for plat_name, searcher in searchers.items():
