@@ -35,10 +35,13 @@ def execute_search(params, settings):
         return []
         
     selected_platforms = [p.lower() for p in settings.get("platforms", ["YouTube", "TikTok", "Instagram"])]
-    depth = settings.get("depth", 1)
-    min_followers = settings.get("min_followers", 1000)
-    country = settings.get("country")
-    language = settings.get("language")
+    depth = params.get("depth") or settings.get("depth", 1)
+    
+    min_followers = params.get("min_followers") if params.get("min_followers") is not None else settings.get("min_followers", 1000)
+    max_followers = params.get("max_followers") if params.get("max_followers") is not None else settings.get("max_followers")
+    
+    country = params.get("country") or settings.get("country")
+    language = params.get("language") or settings.get("language")
     
     searchers = {}
     if "youtube" in selected_platforms and Config.YOUTUBE_API_KEY:
@@ -53,7 +56,7 @@ def execute_search(params, settings):
     analysis_orchestrator = AnalysisOrchestrator(depth=depth, config=Config)
     scorer = Scorer(depth=depth)
     deduplicator = Deduplicator()
-    filterer = Filterer(min_followers=min_followers, country=country, language=language)
+    filterer = Filterer(min_followers=min_followers, max_followers=max_followers, country=country, language=language)
     
     raw_results = []
     for plat_name, searcher in searchers.items():
@@ -98,7 +101,7 @@ def execute_search(params, settings):
         session = SearchSession(
             keyword=keyword,
             platforms=selected_platforms,
-            filters={"min_followers": min_followers, "country": country, "language": language},
+            filters={"min_followers": min_followers, "max_followers": max_followers, "country": country, "language": language},
             depth=depth,
             results=final_creators
         )
@@ -140,23 +143,33 @@ def main():
         response = bot.process_message(prompt, settings)
         
         with st.chat_message("assistant"):
-            st.markdown(response["text"])
             results = None
             if response["action"] == "search":
-                with st.status("Arama yapılıyor..."):
+                st.info(response["text"])
+                with st.status("🔍 Platformlarda aranıyor ve analiz ediliyor..."):
                     render_search_progress()
                     results = execute_search(response["params"], settings)
                 
+                kw = response["params"].get("keyword", prompt)
                 if results:
-                    st.success(format_search_results(results, prompt))
+                    list_text = format_search_results(results, kw)
+                    st.markdown(list_text)
                     render_summary_metrics(results)
                     render_results_table(results, settings["depth"])
-                    render_download_buttons(results, prompt)
+                    render_download_buttons(results, kw)
                     for c in results:
                         render_creator_card(c)
+                    saved_content = list_text
+                else:
+                    empty_text = f"🔍 **'{kw}'** konusu için kriterlere uygun içerik üreticisi bulunamadı. Filtreleri genişleterek tekrar deneyebilirsiniz."
+                    st.warning(empty_text)
+                    saved_content = empty_text
+            else:
+                st.markdown(response["text"])
+                saved_content = response["text"]
             
             history = get_state("chat_history")
-            msg_data = {"role": "assistant", "content": response["text"]}
+            msg_data = {"role": "assistant", "content": saved_content}
             if results:
                 msg_data["results"] = results
             history.append(msg_data)

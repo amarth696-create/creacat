@@ -38,6 +38,14 @@ def render_sidebar() -> Dict[str, Any]:
         help="Minimum takipçi sayısını belirleyin."
     )
     
+    max_followers = st.sidebar.number_input(
+        "Maksimum Takipçi (0 = Sınırsız)",
+        min_value=0,
+        value=0,
+        step=10000,
+        help="Maksimum takipçi sınırı. 0 bırakılırsa üst sınır uygulanmaz."
+    )
+    
     country = st.sidebar.selectbox(
         "Ülke",
         options=["Hepsi", "Türkiye", "ABD", "Almanya", "İngiltere", "Fransa"],
@@ -107,6 +115,7 @@ def render_sidebar() -> Dict[str, Any]:
         "platforms": platforms,
         "depth": depth,
         "min_followers": min_followers,
+        "max_followers": max_followers if max_followers > 0 else None,
         "country": country if country != "Hepsi" else None,
         "language": language if language != "Hepsi" else None
     }

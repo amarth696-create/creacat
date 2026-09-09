@@ -52,8 +52,9 @@ class Filterer:
         if 'min_followers' in filters and followers < filters['min_followers']:
             return False
             
-        if 'max_followers' in filters and followers > filters['max_followers']:
-            return False
+        if 'max_followers' in filters and filters['max_followers'] is not None and filters['max_followers'] > 0:
+            if followers > filters['max_followers']:
+                return False
             
         if 'country' in filters and filters['country']:
             creator_country = getattr(creator, 'country', None)
