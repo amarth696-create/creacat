@@ -112,8 +112,9 @@ class AISearcher(BaseSearcher):
         
         limit = filters.get("limit", 25)
         
-        # Hashtag ve Alt Niş Genişletmesi
-        expanded = KeywordExpander.expand(keyword)
+        # Otomatik İlgili Anahtar Kelime ve Hashtag Genişletmesi
+        expanded = KeywordExpander.expand(keyword, api_key=self.api_key)
+        related_kws = expanded.get("related_keywords", [])
         hashtags = expanded.get("hashtags", [])
         sub_niches = expanded.get("sub_niches", [])
         
@@ -136,17 +137,19 @@ Kullanıcı {min_f:,} ile {max_f:,} takipçi arasındaki MİKRO üreticileri ara
 Sen Türkiye sosyal medya ekosistemini (YouTube, Instagram, TikTok) çok iyi tanıyan kıdemli bir influencer ve içerik keşif uzmanısın.
 
 GÖREVİN:
-Aşağıdaki kriterlere ve ilgili hashtag'lere tam uyan, Türkiye'de aktif ve bilinen GERÇEK içerik üreticilerini ve onların GERÇEK İÇERİKLERİNİ (videolarını / gönderilerini) keşfetmek.
-
-KRİTERLER:
+Kullanıcı arama terimi olarak '{keyword}' belirtti. Sistemimiz bu konuyla bağlantılı olarak aşağıdaki İLGİLİ ANAHTAR KELİMELERİ ve HASHTAG'LERİ otomatik olarak türetti:
 - Ana Konu: {keyword}
-- İlgili Hashtag'ler: {', '.join(hashtags)}
-- Alt Nişler & İçerik Türleri: {', '.join(sub_niches)}
+- Sistem Tarafından Otomatik Türetilen İlgili Anahtar Kelimeler: {', '.join(related_kws)}
+- Taranacak Hashtag'ler: {', '.join(hashtags)}
+- Alt Nişler & Formatlar: {', '.join(sub_niches)}
 - Hedef Platformlar: {plats}
 - Takipçi Aralığı: Minimum {min_f:,} - Maksimum {str(max_f) if max_f else 'Sınırsız'} takipçi
 - Ülke / Bölge: {country}
 - İçerik Dili: {language}
 {follower_directive}
+
+ÖNEMLİ KURAL:
+Yalnızca tek bir kelimeye ('{keyword}') takılıp kalma! Otomatik türetilen ilişkili kelimeler ({', '.join(related_kws[:6])}) ve hashtag'ler altında da video/gönderi üreten gerçek, aktif içerik üreticilerini keşfet ve listele.
 
 ÖNEMLİ KURALLAR:
 1. GİZLİ HESAPLAR KESİNLİKLE YASAK:

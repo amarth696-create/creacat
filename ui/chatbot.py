@@ -1,6 +1,6 @@
 import re
 import json
-from typing import Dict, Any, Optional
+from typing import Dict, List, Any, Optional
 
 try:
     import google.generativeai as genai
@@ -170,8 +170,7 @@ Kullanıcı sol kenar çubuğunda filtrelerini zaten ayarlamıştır:
      * KESİNLİKLE YASAK: Kullanıcının konuşma cümlesini ('platformlara homojen şekilde ağırlık ver...', 'kişileri arıyorum', 'hedef kitlem', 'istiyorum', 'bana bul') keyword içine KOYMA! Yalnızca aranacak öz konuyu yaz.
    - 'min_followers': Kullanıcı mesajında özel olarak yeni bir sayı belirttiyse onu al, yoksa kenar çubuğundaki ({context.get('min_followers')}) değerini kullan.
    - 'max_followers': Kullanıcı mesajında özel olarak üst sınır belirttiyse onu al, yoksa kenar çubuğundaki ({context.get('max_followers') or 'null'}) değerini kullan.
-   - 'platforms': Mesajda özel bir platform kısıtı varsa onu al, yoksa kenar çubuğundakileri ({context.get('platforms')}) koru.
-   - 'reply_text': Kullanıcıya chat ekranında gösterilecek kısa, kibar Türkçe onay cümlesi (Örnek: "'Üniversite öğrencileri' kategorisinde kriterlerinize uygun içerik üreticilerini arıyorum...").
+   - 'reply_text': Kullanıcıya chat ekranında gösterilecek kısa, kibar Türkçe onay cümlesi. Kullanıcının aradığı konuya ek olarak sistemin bu konuyla ilgili türettiği alt başlıkları da (ör: 'üniversite hayatı, study with me, yks hazırlık, ders çalışma') tarayacağını belirten samimi bir cümle kur.
 4. SOHBET KARARI ('action': 'chat'):
    - Yalnızca kullanıcı sadece 'merhaba', 'selam', 'nasılsın' dediğinde ve aranacak hiçbir konu/kategori yoksa kullan.
    - 'reply_text': Samimi Türkçe yanıt. Kenar çubuğundaki filtrelerin farkında olduğunu hissettir.
@@ -310,7 +309,14 @@ Yalnızca geçerli bir JSON nesnesi döndür. Markdown kod bloğu olmadan saf JS
         if not clean_keyword:
             clean_keyword = user_message.strip()
 
-        detail_msg = f"'{clean_keyword}' konusu için içerik üreticileri aranıyor..."
+        from processors.expander import KeywordExpander
+        exp = KeywordExpander.expand(clean_keyword)
+        rel_list = exp.get("related_keywords", [])
+        if rel_list:
+            detail_msg = f"'{clean_keyword}' ve otomatik türetilen ilişkili konular ({', '.join(rel_list[:4])}) taranıyor..."
+        else:
+            detail_msg = f"'{clean_keyword}' konusu için içerik üreticileri aranıyor..."
+            
         f_details = []
         if min_followers:
             f_details.append(f"Min: {min_followers:,}")

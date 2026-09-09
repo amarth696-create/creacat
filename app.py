@@ -32,10 +32,10 @@ st.set_page_config(
 )
 
 def execute_search(params, settings):
-    """Gerçek arama motorunu ve hashtag genişletmesini çalıştırır."""
+    """Gerçek arama motorunu ve otomatik türetilen ilişkili anahtar kelimeleri çalıştırır."""
     keyword = params.get("keyword") or params.get("konu") or ""
     if not keyword:
-        return [], []
+        return [], [], []
         
     raw_platforms = params.get("platforms") or settings.get("platforms", ["YouTube", "TikTok", "Instagram"])
     selected_platforms = [p.lower() for p in raw_platforms]
@@ -52,8 +52,9 @@ def execute_search(params, settings):
     country = params.get("country") or settings.get("country")
     language = params.get("language") or settings.get("language")
     
-    # 1. Anahtar Kelime ve Hashtag Genişletmesi
-    expanded = KeywordExpander.expand(keyword)
+    # 1. Otomatik İlgili Anahtar Kelime ve Hashtag Genişletmesi
+    expanded = KeywordExpander.expand(keyword, api_key=Config.GEMINI_API_KEY)
+    related_keywords = expanded.get("related_keywords", [])
     hashtags = expanded.get("hashtags", [])
     sub_niches = expanded.get("sub_niches", [])
     
@@ -74,15 +75,17 @@ def execute_search(params, settings):
     
     raw_results = []
     
-    # Platform doğrudan arayıcıları
-    for plat_name, searcher in searchers.items():
-        try:
-            plat_results = searcher.search(query=keyword, limit=Config.DEFAULT_LIMIT)
-            raw_results.extend(plat_results)
-        except Exception as e:
-            st.warning(f"{plat_name.capitalize()} araması sırasında uyarı: {e}")
+    # Platformlarda Ana Kelime ve Türetilen En İlgili Kelimeler ile Çoklu Tarama
+    terms_to_search = [keyword] + [k for k in related_keywords[:3] if k.lower() != keyword.lower()]
+    for term in terms_to_search:
+        for plat_name, searcher in searchers.items():
+            try:
+                plat_results = searcher.search(query=term, limit=Config.DEFAULT_LIMIT)
+                raw_results.extend(plat_results)
+            except Exception as e:
+                st.warning(f"{plat_name.capitalize()} '{term}' araması sırasında uyarı: {e}")
             
-    # 2. Yapay Zeka & Hashtag Keşif Motoru (Doğrudan kullanıcının takipçi aralığına odaklanır)
+    # 2. Yapay Zeka & Hashtag Keşif Motoru (Tüm türetilen anahtar kelimeleri ve takipçi kısıtlarını işler)
     try:
         ai_searcher = AISearcher(Config.GEMINI_API_KEY)
         ai_results = ai_searcher.search(
@@ -101,7 +104,7 @@ def execute_search(params, settings):
         st.warning(f"AI Keşif Motoru uyarısı: {e}")
             
     if not raw_results:
-        return [], hashtags
+        return [], hashtags, related_keywords
         
     normalized = normalizer.normalize(raw_results)
     
@@ -147,7 +150,7 @@ def execute_search(params, settings):
     except Exception:
         pass
         
-    return final_creators, hashtags
+    return final_creators, hashtags, related_keywords
 
 def main():
     init_session_state()
@@ -184,17 +187,20 @@ def main():
         with st.chat_message("assistant"):
             results = None
             hashtags = []
+            related_keywords = []
             if response["action"] == "search":
                 st.info(response["text"])
                 with st.status("🔍 Platformlarda aranıyor ve analiz ediliyor..."):
                     render_search_progress()
-                    results, hashtags = execute_search(response["params"], settings)
+                    results, hashtags, related_keywords = execute_search(response["params"], settings)
+                    if related_keywords:
+                        st.write(f"💡 **Otomatik Türetilen İlgili Arama Kelimeleri:** {', '.join([f'`{k}`' for k in related_keywords[:6]])}")
                     if hashtags:
                         st.write(f"🏷️ **Taranan Hashtag & Alt Nişler:** {', '.join(hashtags[:6])}")
                 
                 kw = response["params"].get("keyword", prompt)
                 if results:
-                    list_text = format_search_results(results, kw, hashtags=hashtags)
+                    list_text = format_search_results(results, kw, hashtags=hashtags, related_keywords=related_keywords)
                     st.markdown(list_text)
                     render_summary_metrics(results)
                     render_results_table(results, settings["depth"])
