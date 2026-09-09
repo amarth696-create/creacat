@@ -23,6 +23,8 @@ from processors.deduplicator import Deduplicator
 from processors.filterer import Filterer
 from analyzers.analysis_orchestrator import AnalysisOrchestrator
 
+from processors.expander import KeywordExpander
+
 st.set_page_config(
     page_title="İçerik Üretici Keşif Sistemi",
     page_icon="🔍",
@@ -30,10 +32,10 @@ st.set_page_config(
 )
 
 def execute_search(params, settings):
-    """Gerçek arama motorunu çalıştırır."""
+    """Gerçek arama motorunu ve hashtag genişletmesini çalıştırır."""
     keyword = params.get("keyword") or params.get("konu") or ""
     if not keyword:
-        return []
+        return [], []
         
     raw_platforms = params.get("platforms") or settings.get("platforms", ["YouTube", "TikTok", "Instagram"])
     selected_platforms = [p.lower() for p in raw_platforms]
@@ -49,6 +51,11 @@ def execute_search(params, settings):
     
     country = params.get("country") or settings.get("country")
     language = params.get("language") or settings.get("language")
+    
+    # 1. Anahtar Kelime ve Hashtag Genişletmesi
+    expanded = KeywordExpander.expand(keyword)
+    hashtags = expanded.get("hashtags", [])
+    sub_niches = expanded.get("sub_niches", [])
     
     searchers = {}
     if "youtube" in selected_platforms and Config.YOUTUBE_API_KEY:
@@ -66,6 +73,8 @@ def execute_search(params, settings):
     filterer = Filterer(min_followers=min_followers, max_followers=max_followers, country=country, language=language)
     
     raw_results = []
+    
+    # Platform doğrudan arayıcıları
     for plat_name, searcher in searchers.items():
         try:
             plat_results = searcher.search(query=keyword, limit=Config.DEFAULT_LIMIT)
@@ -73,27 +82,26 @@ def execute_search(params, settings):
         except Exception as e:
             st.warning(f"{plat_name.capitalize()} araması sırasında uyarı: {e}")
             
-    # Eğer doğrudan API/kazıma sonuçları yetersizse (< 5), Gemini AI Keşif Motoru ile zenginleştir
-    if len(raw_results) < 5:
-        try:
-            ai_searcher = AISearcher(Config.GEMINI_API_KEY)
-            ai_results = ai_searcher.search(
-                query=keyword,
-                limit=Config.DEFAULT_LIMIT,
-                filters={
-                    "min_followers": min_followers,
-                    "max_followers": max_followers,
-                    "platforms": raw_platforms,
-                    "country": country,
-                    "language": language
-                }
-            )
-            raw_results.extend(ai_results)
-        except Exception as e:
-            st.warning(f"AI Keşif Motoru uyarısı: {e}")
+    # 2. Yapay Zeka & Hashtag Keşif Motoru (Doğrudan kullanıcının takipçi aralığına odaklanır)
+    try:
+        ai_searcher = AISearcher(Config.GEMINI_API_KEY)
+        ai_results = ai_searcher.search(
+            query=keyword,
+            limit=Config.DEFAULT_LIMIT,
+            filters={
+                "min_followers": min_followers,
+                "max_followers": max_followers,
+                "platforms": raw_platforms,
+                "country": country,
+                "language": language
+            }
+        )
+        raw_results.extend(ai_results)
+    except Exception as e:
+        st.warning(f"AI Keşif Motoru uyarısı: {e}")
             
     if not raw_results:
-        return []
+        return [], hashtags
         
     normalized = normalizer.normalize(raw_results)
     
@@ -113,7 +121,6 @@ def execute_search(params, settings):
     if not filtered and unique_creators:
         filtered = unique_creators[:Config.DEFAULT_LIMIT]
 
-    
     # Analiz
     analyzed = []
     for c in filtered:
@@ -140,7 +147,7 @@ def execute_search(params, settings):
     except Exception:
         pass
         
-    return final_creators
+    return final_creators, hashtags
 
 def main():
     init_session_state()
@@ -176,15 +183,18 @@ def main():
         
         with st.chat_message("assistant"):
             results = None
+            hashtags = []
             if response["action"] == "search":
                 st.info(response["text"])
                 with st.status("🔍 Platformlarda aranıyor ve analiz ediliyor..."):
                     render_search_progress()
-                    results = execute_search(response["params"], settings)
+                    results, hashtags = execute_search(response["params"], settings)
+                    if hashtags:
+                        st.write(f"🏷️ **Taranan Hashtag & Alt Nişler:** {', '.join(hashtags[:6])}")
                 
                 kw = response["params"].get("keyword", prompt)
                 if results:
-                    list_text = format_search_results(results, kw)
+                    list_text = format_search_results(results, kw, hashtags=hashtags)
                     st.markdown(list_text)
                     render_summary_metrics(results)
                     render_results_table(results, settings["depth"])

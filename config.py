@@ -1,9 +1,10 @@
 import os
 from pathlib import Path
-from dotenv import load_dotenv
-
-# .env dosyasını yükle
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 def _get_api_key(key_name: str, default: str = "") -> str:
     # 1. Environment variables (büyük veya küçük harf)

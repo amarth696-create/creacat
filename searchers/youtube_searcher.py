@@ -83,28 +83,31 @@ class YouTubeSearcher(BaseSearcher):
             except Exception as e:
                 self.logger.warning(f"YouTube video arama hatası: {e}")
                 
-            # 3. Eğer sonuç az ise kök kelimeyle de ara (örn: öğrencilik -> öğrenci)
-            if len(channel_ids_set) < 5:
-                alt_keyword = keyword
-                for suffix in ['lik', 'lık', 'luk', 'lük', 'cilik', 'cılık']:
-                    if alt_keyword.endswith(suffix):
-                        alt_keyword = alt_keyword[:-len(suffix)]
+            # 3. İlgili genişletilmiş sorgularla (ör: study with me, öğrenci vlog) ek kanalları topla
+            try:
+                from processors.expander import KeywordExpander
+                expanded = KeywordExpander.expand(keyword)
+                queries = expanded.get("queries", [])
+                for q in queries[:2]:
+                    if len(channel_ids_set) >= 35:
                         break
-                if alt_keyword != keyword:
                     try:
                         self.rate_limiter.wait()
-                        alt_resp = self.youtube.search().list(
-                            q=alt_keyword,
+                        q_resp = self.youtube.search().list(
+                            q=q,
                             type='video',
                             part='snippet',
-                            maxResults=25
+                            maxResults=20
                         ).execute()
-                        for item in alt_resp.get('items', []):
+                        self.quota_used += 100
+                        for item in q_resp.get('items', []):
                             cid = item.get('snippet', {}).get('channelId')
                             if cid:
                                 channel_ids_set.add(cid)
                     except Exception:
                         pass
+            except Exception:
+                pass
                         
             channel_ids = list(channel_ids_set)[:50]
             if not channel_ids:

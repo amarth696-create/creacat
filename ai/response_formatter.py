@@ -1,13 +1,17 @@
 from typing import List, Any
 
-def format_search_results(creators: List[Any], keyword: str) -> str:
+def format_search_results(creators: List[Any], keyword: str, hashtags: List[str] = None) -> str:
     """Arama sonuçlarını özetleyen zengin, içerik odaklı ve spesifik bir Türkçe liste metni oluşturur."""
     if not creators:
         return f"🔍 **'{keyword}'** konusu için kriterlere uygun içerik üreticisi bulunamadı. Lütfen filtreleri genişleterek tekrar deneyin."
     
+    tag_str = ""
+    if hashtags:
+        tag_str = f"🏷️ **Taranan Hashtag & Nişler:** {' '.join([f'`{t}`' for t in hashtags[:8]])}\n\n"
+        
     lines = [
         f"### 🎯 '{keyword.capitalize()}' Konusunda İçerikleri Doğrulanan En Uygun Üreticiler ({len(creators)} Kişi):",
-        ""
+        tag_str
     ]
     
     for i, c in enumerate(creators, 1):
