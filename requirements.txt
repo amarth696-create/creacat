@@ -1,6 +1,7 @@
 streamlit
 plotly
 google-genai
+google-generativeai
 google-api-python-client
 playwright
 playwright-stealth
