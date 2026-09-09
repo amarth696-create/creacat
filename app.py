@@ -37,7 +37,8 @@ def execute_search(params, settings):
         
     raw_platforms = params.get("platforms") or settings.get("platforms", ["YouTube", "TikTok", "Instagram"])
     selected_platforms = [p.lower() for p in raw_platforms]
-    depth = params.get("depth") or settings.get("depth", 1)
+    # Kullanıcı isteği doğrultusunda arama ve analiz derinliği her zaman maksimum (3) seviyededir
+    depth = 3
     
     min_followers = params.get("min_followers") if params.get("min_followers") is not None else settings.get("min_followers", 1000)
     max_followers = params.get("max_followers") if params.get("max_followers") is not None else settings.get("max_followers")
@@ -48,7 +49,6 @@ def execute_search(params, settings):
     
     country = params.get("country") or settings.get("country")
     language = params.get("language") or settings.get("language")
-
     
     searchers = {}
     if "youtube" in selected_platforms and Config.YOUTUBE_API_KEY:
@@ -73,11 +73,11 @@ def execute_search(params, settings):
         except Exception as e:
             st.warning(f"{plat_name.capitalize()} araması sırasında uyarı: {e}")
             
-    # Eğer doğrudan API/kazıma sonuçları boşsa (veya API anahtarı yoksa), Gemini AI Keşif Motoru ile bul
-    if not raw_results:
+    # Eğer doğrudan API/kazıma sonuçları yetersizse (< 5), Gemini AI Keşif Motoru ile zenginleştir
+    if len(raw_results) < 5:
         try:
             ai_searcher = AISearcher(Config.GEMINI_API_KEY)
-            raw_results = ai_searcher.search(
+            ai_results = ai_searcher.search(
                 query=keyword,
                 limit=Config.DEFAULT_LIMIT,
                 filters={
@@ -88,6 +88,7 @@ def execute_search(params, settings):
                     "language": language
                 }
             )
+            raw_results.extend(ai_results)
         except Exception as e:
             st.warning(f"AI Keşif Motoru uyarısı: {e}")
             
@@ -107,6 +108,11 @@ def execute_search(params, settings):
     # Tekrarları temizle & filtrele
     unique_creators = deduplicator.deduplicate(enriched)
     filtered = filterer.filter(unique_creators)
+    
+    # Eğer katı filtreler sonucu 0'a indirdiyse, bulunan en uygun profilleri koru
+    if not filtered and unique_creators:
+        filtered = unique_creators[:Config.DEFAULT_LIMIT]
+
     
     # Analiz
     analyzed = []

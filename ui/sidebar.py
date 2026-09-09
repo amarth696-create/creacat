@@ -15,20 +15,10 @@ def render_sidebar() -> Dict[str, Any]:
         help="Arama yapılacak platformları seçin."
     )
     
-    depth_labels = {
-        1: "1 - Hızlı Tarama",
-        2: "2 - Ses+Görsel Analiz",
-        3: "3 - Derin AI Analiz"
-    }
-    depth = st.sidebar.slider(
-        "Analiz Derinliği",
-        min_value=1,
-        max_value=3,
-        value=1,
-        format="%d",
-        help="1: Sadece temel metrikler, 2: İçerik analizi, 3: Detaylı profil analizi"
-    )
-    st.sidebar.caption(depth_labels[depth])
+    # Analiz derinliği varsayılan olarak her zaman maksimum (3) seviyededir
+    depth = 3
+    st.sidebar.caption("⚡ **Analiz Seviyesi:** Maksimum (Derin AI Analizi)")
+
     
     min_followers = st.sidebar.number_input(
         "Minimum Takipçi",
