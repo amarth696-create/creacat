@@ -15,6 +15,7 @@ from models.search_session import SearchSession
 from searchers.youtube_searcher import YouTubeSearcher
 from searchers.tiktok_searcher import TikTokSearcher
 from searchers.instagram_searcher import InstagramSearcher
+from searchers.ai_searcher import AISearcher
 from searchers.google_enricher import GoogleEnricher
 from processors.normalizer import Normalizer
 from processors.scorer import Scorer
@@ -71,6 +72,24 @@ def execute_search(params, settings):
             raw_results.extend(plat_results)
         except Exception as e:
             st.warning(f"{plat_name.capitalize()} araması sırasında uyarı: {e}")
+            
+    # Eğer doğrudan API/kazıma sonuçları boşsa (veya API anahtarı yoksa), Gemini AI Keşif Motoru ile bul
+    if not raw_results:
+        try:
+            ai_searcher = AISearcher(Config.GEMINI_API_KEY)
+            raw_results = ai_searcher.search(
+                query=keyword,
+                limit=Config.DEFAULT_LIMIT,
+                filters={
+                    "min_followers": min_followers,
+                    "max_followers": max_followers,
+                    "platforms": raw_platforms,
+                    "country": country,
+                    "language": language
+                }
+            )
+        except Exception as e:
+            st.warning(f"AI Keşif Motoru uyarısı: {e}")
             
     if not raw_results:
         return []

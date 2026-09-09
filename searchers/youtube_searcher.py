@@ -47,19 +47,70 @@ class YouTubeSearcher(BaseSearcher):
             self.logger.info(f"YouTube üzerinde '{keyword}' için arama başlatılıyor...")
             self.rate_limiter.wait()
             
-            # Adım a: search.list
-            search_response = self.youtube.search().list(
-                q=keyword,
-                type='channel',
-                part='id',
-                maxResults=50
-            ).execute()
-            self.quota_used += 100
+            # Adım a: Hem kanal araması hem de video araması yaparak içerik üreten kanalları topla
+            channel_ids_set = set()
             
-            channel_ids = [item['id']['channelId'] for item in search_response.get('items', [])]
+            # 1. Doğrudan kanal araması
+            try:
+                ch_resp = self.youtube.search().list(
+                    q=keyword,
+                    type='channel',
+                    part='id',
+                    maxResults=25
+                ).execute()
+                self.quota_used += 100
+                for item in ch_resp.get('items', []):
+                    cid = item.get('id', {}).get('channelId')
+                    if cid:
+                        channel_ids_set.add(cid)
+            except Exception as e:
+                self.logger.warning(f"YouTube kanal arama hatası: {e}")
+
+            # 2. Bu konuda video üreten aktif kanal sahiplerini topla
+            try:
+                self.rate_limiter.wait()
+                vid_resp = self.youtube.search().list(
+                    q=keyword,
+                    type='video',
+                    part='snippet',
+                    maxResults=35
+                ).execute()
+                self.quota_used += 100
+                for item in vid_resp.get('items', []):
+                    cid = item.get('snippet', {}).get('channelId')
+                    if cid:
+                        channel_ids_set.add(cid)
+            except Exception as e:
+                self.logger.warning(f"YouTube video arama hatası: {e}")
+                
+            # 3. Eğer sonuç az ise kök kelimeyle de ara (örn: öğrencilik -> öğrenci)
+            if len(channel_ids_set) < 5:
+                alt_keyword = keyword
+                for suffix in ['lik', 'lık', 'luk', 'lük', 'cilik', 'cılık']:
+                    if alt_keyword.endswith(suffix):
+                        alt_keyword = alt_keyword[:-len(suffix)]
+                        break
+                if alt_keyword != keyword:
+                    try:
+                        self.rate_limiter.wait()
+                        alt_resp = self.youtube.search().list(
+                            q=alt_keyword,
+                            type='video',
+                            part='snippet',
+                            maxResults=25
+                        ).execute()
+                        for item in alt_resp.get('items', []):
+                            cid = item.get('snippet', {}).get('channelId')
+                            if cid:
+                                channel_ids_set.add(cid)
+                    except Exception:
+                        pass
+                        
+            channel_ids = list(channel_ids_set)[:50]
             if not channel_ids:
                 self.logger.warning(f"'{keyword}' için YouTube'da kanal bulunamadı.")
                 return creators
+
                 
             # Adım b: channels.list
             self.rate_limiter.wait()
