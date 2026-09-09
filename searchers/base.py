@@ -35,19 +35,32 @@ class BaseSearcher(abc.ABC):
         for creator in creators:
             # Minimum takipçi filtresi
             min_followers = filters.get('min_followers', 0)
-            if getattr(creator, 'followers', 0) < min_followers:
+            if min_followers and getattr(creator, 'followers', 0) < min_followers:
                 continue
                 
-            # Ülke filtresi
+            max_followers = filters.get('max_followers')
+            if max_followers and getattr(creator, 'followers', 0) > max_followers:
+                continue
+                
+            # Ülke filtresi (alias destekli)
             country = filters.get('country')
-            if country and getattr(creator, 'country', None) != country:
-                continue
+            if country:
+                c_str = str(country).lower().strip()
+                allowed_c = {"tr", "tur", "turkey", "türkiye"} if c_str in ["tr", "turkey", "türkiye"] else {c_str}
+                cr_c = str(getattr(creator, 'country', '') or '').lower().strip()
+                if cr_c and cr_c not in allowed_c:
+                    continue
                 
-            # Dil filtresi
+            # Dil filtresi (alias destekli)
             language = filters.get('language')
-            if language and getattr(creator, 'language', None) != language:
-                continue
+            if language:
+                l_str = str(language).lower().strip()
+                allowed_l = {"tr", "tur", "turkish", "türkçe"} if l_str in ["tr", "turkish", "türkçe"] else {l_str}
+                cr_l = str(getattr(creator, 'language', '') or '').lower().strip()
+                if cr_l and cr_l not in allowed_l:
+                    continue
                 
             filtered_creators.append(creator)
             
         return filtered_creators
+

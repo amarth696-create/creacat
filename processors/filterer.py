@@ -42,6 +42,22 @@ class Filterer:
         
         return filtered_creators
         
+    COUNTRY_ALIASES = {
+        "türkiye": {"tr", "tur", "turkey", "türkiye"},
+        "turkey": {"tr", "tur", "turkey", "türkiye"},
+        "abd": {"us", "usa", "united states", "america", "abd"},
+        "almanya": {"de", "deu", "germany", "deutschland", "almanya"},
+        "ingiltere": {"gb", "gbr", "uk", "united kingdom", "ingiltere"},
+        "fransa": {"fr", "fra", "france", "fransa"}
+    }
+
+    LANGUAGE_ALIASES = {
+        "türkçe": {"tr", "tur", "turkish", "türkçe"},
+        "turkish": {"tr", "tur", "turkish", "türkçe"},
+        "ingilizce": {"en", "eng", "english", "ingilizce"},
+        "almanca": {"de", "deu", "german", "almanca"}
+    }
+
     def _meets_criteria(self, creator: Creator, filters: dict) -> bool:
         """İçerik üreticisinin tüm filtrelere uyup uymadığını kontrol eder."""
         if not filters:
@@ -49,31 +65,43 @@ class Filterer:
             
         followers = getattr(creator, 'followers', 0)
         
-        if 'min_followers' in filters and followers < filters['min_followers']:
-            return False
+        if 'min_followers' in filters and filters['min_followers'] is not None and filters['min_followers'] > 0:
+            if followers < filters['min_followers']:
+                return False
             
         if 'max_followers' in filters and filters['max_followers'] is not None and filters['max_followers'] > 0:
             if followers > filters['max_followers']:
                 return False
             
         if 'country' in filters and filters['country']:
-            creator_country = getattr(creator, 'country', None)
-            if not creator_country or creator_country.lower() != filters['country'].lower():
+            target_country = str(filters['country']).lower().strip()
+            allowed = self.COUNTRY_ALIASES.get(target_country, {target_country})
+            creator_country = str(getattr(creator, 'country', '') or '').lower().strip()
+            
+            # Eğer hesapta ülke bilgisi varsa ve hedef ülke ile uyuşmuyorsa ele
+            if creator_country and creator_country not in allowed:
                 return False
                 
         if 'language' in filters and filters['language']:
-            creator_lang = getattr(creator, 'language', None)
-            if not creator_lang or creator_lang.lower() != filters['language'].lower():
+            target_lang = str(filters['language']).lower().strip()
+            allowed_langs = self.LANGUAGE_ALIASES.get(target_lang, {target_lang})
+            creator_lang = str(getattr(creator, 'language', '') or '').lower().strip()
+            
+            # Eğer hesapta dil bilgisi varsa ve hedef dil ile uyuşmuyorsa ele
+            if creator_lang and creator_lang not in allowed_langs:
                 return False
                 
-        if 'min_engagement_rate' in filters:
+        if 'min_engagement_rate' in filters and filters['min_engagement_rate'] is not None:
             rate = getattr(creator, 'engagement_rate', 0.0) or 0.0
             if rate < filters['min_engagement_rate']:
                 return False
                 
         if 'platforms' in filters and filters['platforms']:
             platform = getattr(creator, 'platform', '')
-            if platform.lower() not in [p.lower() for p in filters['platforms']]:
-                return False
+            if platform:
+                p_str = platform.value if hasattr(platform, 'value') else str(platform)
+                if p_str.lower() not in [p.lower() for p in filters['platforms']]:
+                    return False
                 
         return True
+

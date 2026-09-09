@@ -34,14 +34,20 @@ def execute_search(params, settings):
     if not keyword:
         return []
         
-    selected_platforms = [p.lower() for p in settings.get("platforms", ["YouTube", "TikTok", "Instagram"])]
+    raw_platforms = params.get("platforms") or settings.get("platforms", ["YouTube", "TikTok", "Instagram"])
+    selected_platforms = [p.lower() for p in raw_platforms]
     depth = params.get("depth") or settings.get("depth", 1)
     
     min_followers = params.get("min_followers") if params.get("min_followers") is not None else settings.get("min_followers", 1000)
     max_followers = params.get("max_followers") if params.get("max_followers") is not None else settings.get("max_followers")
+    if max_followers == 0:
+        max_followers = None
+    if min_followers == 0:
+        min_followers = None
     
     country = params.get("country") or settings.get("country")
     language = params.get("language") or settings.get("language")
+
     
     searchers = {}
     if "youtube" in selected_platforms and Config.YOUTUBE_API_KEY:
@@ -136,11 +142,12 @@ def main():
         with st.chat_message("user"):
             st.markdown(prompt)
             
-        history = get_state("chat_history")
+        existing_history = get_state("chat_history")
+        response = bot.process_message(prompt, settings, history=existing_history)
+        
+        history = list(existing_history)
         history.append({"role": "user", "content": prompt})
         set_state("chat_history", history)
-        
-        response = bot.process_message(prompt, settings)
         
         with st.chat_message("assistant"):
             results = None
