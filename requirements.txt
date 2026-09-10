@@ -21,3 +21,4 @@ torchvision
 openpyxl
 python-dotenv
 rich
+duckduckgo-search

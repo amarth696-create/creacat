@@ -42,6 +42,14 @@ class ConfigMeta(type):
     def GEMINI_API_KEY(cls) -> str:
         return _get_api_key('GEMINI_API_KEY')
 
+    @property
+    def GOOGLE_CSE_KEY(cls) -> str:
+        return _get_api_key('GOOGLE_CSE_KEY')
+    
+    @property
+    def GOOGLE_CSE_CX(cls) -> str:
+        return _get_api_key('GOOGLE_CSE_CX')
+
 class Config(metaclass=ConfigMeta):
     """Uygulama konfigürasyon sınıfı."""
     
