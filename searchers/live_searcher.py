@@ -186,6 +186,7 @@ class LiveSearcher(BaseSearcher):
                         )
                         creator.engagement_rate = 4.2
                         creator.is_private = False
+                        creator.set_activity("Son 1 ay içinde aktif", is_active=True)
                         creator.recent_contents = [
                             f"{term.capitalize()} ile ilgili güncel video ve vlog içerikleri",
                             f"{title} kanalının en son paylaşılan videoları"
@@ -225,6 +226,7 @@ class LiveSearcher(BaseSearcher):
                         nav_endpoint = vr.get("ownerText", {}).get("runs", [{}])[0].get("navigationEndpoint", {})
                         endpoint = nav_endpoint.get("canonicalBaseUrl", "") or nav_endpoint.get("browseEndpoint", {}).get("canonicalBaseUrl", "")
                         view_text = vr.get("viewCountText", {}).get("simpleText", "")
+                        pub_time = vr.get("publishedTimeText", {}).get("simpleText", "").strip()
                         
                         if not channel_name or not endpoint:
                             continue
@@ -249,12 +251,16 @@ class LiveSearcher(BaseSearcher):
                         )
                         creator.engagement_rate = 4.5
                         creator.is_private = False
+                        # Aktivite durumunu ve son içerik tarihini değerlendir
+                        creator.set_activity(time_text=pub_time or "Son 1 ay içinde aktif")
+                        
+                        date_str = f" • {pub_time}" if pub_time else ""
                         creator.recent_contents = [
-                            f"Son Video: {vid_title} ({view_text})",
+                            f"Son Video: {vid_title} ({view_text}{date_str})",
                             f"{term.capitalize()} vlog ve rehber serisi"
                         ]
                         creator.content_analysis = ContentAnalysis(
-                            llm_ozet=f"{channel_name}, '{vid_title}' başlıklı videosuyla '{term}' konusunda aktif olarak içerik üretmektedir.",
+                            llm_ozet=f"{channel_name}, '{vid_title}' başlıklı videosuyla '{term}' konusunda içerik üretmektedir. {creator.inactivity_warning or ''}",
                             nis_alani=term,
                             ana_konular=[vid_title, term],
                             hedef_kitle="İlgili Takipçiler",
@@ -305,6 +311,7 @@ class LiveSearcher(BaseSearcher):
                             )
                             creator.engagement_rate = 4.8
                             creator.is_private = False
+                            creator.set_activity("Son 1 ay içinde aktif", is_active=True)
                             creator.recent_contents = [
                                 f"{term.capitalize()} temalı Reels ve gönderiler",
                                 f"{title} Instagram soru-cevap ve hikaye paylaşımları"
@@ -336,6 +343,7 @@ class LiveSearcher(BaseSearcher):
                             )
                             creator.engagement_rate = 5.4
                             creator.is_private = False
+                            creator.set_activity("Son 1 ay içinde aktif", is_active=True)
                             creator.recent_contents = [
                                 f"{term.capitalize()} kısa formatlı viral videolar",
                                 f"Trend sesler ve {term} günlük vlog kesitleri"

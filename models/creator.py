@@ -52,8 +52,24 @@ class Creator:
     final_score: float = 0.0
     recent_contents: List[str] = field(default_factory=list)
     is_private: bool = False
+    is_active: bool = True
+    last_post_date: Optional[str] = None
+    inactivity_warning: Optional[str] = None
     scraped_at: datetime = field(default_factory=datetime.now)
     analysis_depth: int = 1
+
+    def set_activity(self, time_text: Optional[str] = None, is_active: Optional[bool] = None) -> None:
+        """Son paylaşım tarihine göre profilin aktivite durumunu belirler."""
+        if time_text:
+            self.last_post_date = str(time_text).strip()
+            from utils.activity import evaluate_activity_status
+            act, dt, warn = evaluate_activity_status(self.last_post_date)
+            self.is_active = act if is_active is None else is_active
+            self.inactivity_warning = warn if not self.is_active else None
+        elif is_active is not None:
+            self.is_active = is_active
+            if not is_active and not self.inactivity_warning:
+                self.inactivity_warning = "⚠️ Bu profil 2 aydan uzun süredir yeni içerik üretmemiştir (İnaktif)."
 
 
     def to_dict(self) -> Dict[str, Any]:

@@ -40,10 +40,23 @@ def format_search_results(creators: List[Any], keyword: str, hashtags: List[str]
         plat_lower = plat_str.lower()
         badge = "🔴 YouTube" if "youtube" in plat_lower else ("🟣 Instagram" if "instagram" in plat_lower else ("⚫ TikTok" if "tiktok" in plat_lower else plat_str))
         
+        # Aktivite & güncellik bilgisi
+        is_active = getattr(c, "is_active", True)
+        last_post = getattr(c, "last_post_date", None)
+        inactivity_warn = getattr(c, "inactivity_warning", None)
+        
+        act_badge = "🟢 **Aktif Üretici**" if is_active else "⚠️ **İNAKTİF (2+ aydır içerik yok)**"
+        
         link = f"[{username}]({url})" if url != "#" else f"**@{username}**"
-        lines.append(f"{i}. 👤 **{link}** — **{badge}**")
+        lines.append(f"{i}. 👤 **{link}** — **{badge}** — {act_badge}")
         lines.append(f"   • 👥 **Takipçi:** {followers:,} | 📈 **Etkileşim:** %{eng:.2f} | ⭐ **Uygunluk Skoru:** {score:.1f}/100 | 🟢 **Herkese Açık**")
         
+        if not is_active:
+            warning_msg = inactivity_warn or f"Bu profil 2 aydan uzun süredir yeni içerik üretmemiştir ({last_post or 'uzun süredir inaktif'})."
+            lines.append(f"   • ⚠️ **İNAKTİFLİK UYARISI:** {warning_msg}")
+        elif last_post:
+            lines.append(f"   • 🕒 **Son İçerik:** {last_post}")
+
         if bio:
             short_bio = bio[:180] + ("..." if len(bio) > 180 else "")
             lines.append(f"   • 📝 **Biyografi:** {short_bio}")

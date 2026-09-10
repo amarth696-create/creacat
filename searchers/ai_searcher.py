@@ -171,6 +171,9 @@ Yalnızca tek bir kelimeye ('{keyword}') takılıp kalma! Otomatik türetilen il
    - Eğer 'YouTube' seçildiyse: En az 7-8 adet gerçek, aktif YouTube kanalı (format: https://www.youtube.com/@kanaladi).
    - Kesinlikle sadece tek bir platforma yığılma yapma! Her seçilen platformdan mutlaka kaliteli ve zengin profiller ver.
    - Takipçi sayısının kullanıcının belirttiği aralıkta ({min_f:,} - {str(max_f) if max_f else 'Sınırsız'}) olmasına özen göster.
+5. AKTİVİTE VE GÜNCELLİK TESPİTİ (2+ AY İNAKTİFLİK KURALI):
+   - 'last_post_date': Bu üreticinin son videosunun veya gönderisinin zamanı (örn: '2 gün önce', '1 hafta önce', '3 ay önce', '1 yıl önce').
+   - 'is_active': Üretici son 2 ay içinde aktif içerik ürettiyse true, 2 aydan uzun süredir içerik üretmiyorsa (inaktif ise) false yap.
 
 YANIT FORMATI:
 SADECE aşağıdaki JSON formatında geçerli bir JSON listesi döndür. Kesinlikle markdown kod bloğu olmadan saf JSON ver:
@@ -182,6 +185,8 @@ SADECE aşağıdaki JSON formatında geçerli bir JSON listesi döndür. Kesinli
     "followers": 15000,
     "profile_url": "https://www.instagram.com/kullaniciadi/",
     "is_private": false,
+    "is_active": true,
+    "last_post_date": "1 hafta önce",
     "bio": "Profil biyografi metni",
     "recent_contents": [
       "Örnek İçerik 1: Üniversite Vize Haftası Rutinim ve Tavsiyeler",
@@ -263,6 +268,9 @@ Türkiye'de '{keyword}' konusunda (ve ilişkili: {', '.join(related_kws[:6]) if 
 3. Çalışan doğrudan link ver: {url_fmt} (Asla arama veya anasayfa linki verme).
 4. recent_contents: Bu üreticinin yayınladığı 2-3 somut video/Reels veya gönderi konusunu yaz.
 5. content_review: Üreticinin içeriğinin tarzını ve '{keyword}' konusuna neden tam uyduğunu detaylı açıkla.
+6. AKTİVİTE VE GÜNCELLİK TESPİTİ (2+ AY İNAKTİFLİK KURALI):
+   - 'last_post_date': Bu üreticinin son videosunun veya gönderisinin yaklaşık zamanı (örn: '2 gün önce', '1 hafta önce', '3 ay önce', '1 yıl önce').
+   - 'is_active': Üretici son 2 ay içinde aktif içerik ürettiyse true, 2 aydan uzun süredir içerik üretmiyorsa (inaktif ise) false yap.
 
 YANIT FORMATI:
 SADECE aşağıdaki JSON formatında geçerli bir JSON listesi döndür (kesinlikle markdown kod bloğu olmadan saf JSON):
@@ -274,6 +282,8 @@ SADECE aşağıdaki JSON formatında geçerli bir JSON listesi döndür (kesinli
     "followers": 12500,
     "profile_url": "{url_fmt}",
     "is_private": false,
+    "is_active": true,
+    "last_post_date": "1 hafta önce",
     "bio": "Profil biyografisi",
     "recent_contents": ["İçerik 1", "İçerik 2"],
     "content_review": "Bu hesap {keyword} konusunda aktif ve eğitici paylaşımlar yapmaktadır.",
@@ -342,6 +352,14 @@ SADECE aşağıdaki JSON formatında geçerli bir JSON listesi döndür (kesinli
                 c.engagement_rate = eng_rate
                 c.is_private = False
                 c.recent_contents = recent
+
+                # Aktivite ve güncellik durumu
+                last_post = item.get("last_post_date") or item.get("son_paylasim")
+                is_act = item.get("is_active")
+                if is_act is None and last_post:
+                    c.set_activity(str(last_post))
+                else:
+                    c.set_activity(str(last_post or "Aktif"), is_active=(is_act if is_act is not None else True))
                 
                 # İçerik analiz özetini oluştur
                 from models.creator import ContentAnalysis
@@ -454,6 +472,7 @@ SADECE aşağıdaki JSON formatında geçerli bir JSON listesi döndür (kesinli
                     "platform": "Instagram",
                     "followers": 8900,
                     "url": "https://www.instagram.com/mimarogrenci_vlog/",
+                    "last_post": "3 ay önce",
                     "bio": "Mimarlık öğrencisi pafta teslimleri, maket yapımı ve kampüs günlüğü.",
                     "recent": ["Sabahlamalı Pafta Teslim Haftası", "Maket Malzemeleri Alışverişi ve Fiyatlar", "Mimarlıkta 1. Yıl Neler Öğrendim?"],
                     "review": "Mimarlık ve tasarım öğrencisi bakış açısıyla atölye sabahlamalarını, proje eskizlerini ve öğrenci hayatının gerçeklerini yansıtıyor."
@@ -885,6 +904,10 @@ SADECE aşağıdaki JSON formatında geçerli bir JSON listesi döndür (kesinli
             c.engagement_rate = 4.5
             c.is_private = False
             c.recent_contents = p.get("recent", [])
+            
+            # Aktivite durumu
+            last_p = p.get("last_post", "3 gün önce")
+            c.set_activity(last_p)
             
             from models.creator import ContentAnalysis
             c.content_analysis = ContentAnalysis(

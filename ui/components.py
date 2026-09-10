@@ -19,8 +19,18 @@ def render_creator_card(creator: Any) -> None:
     
     score = getattr(creator, "final_score", 0.0) or getattr(creator, "score", 0.0) or 0.0
     eng_rate = getattr(creator, "engagement_rate", 0.0) or 0.0
+    is_active = getattr(creator, "is_active", True)
+    last_post = getattr(creator, "last_post_date", None)
+    inactivity_warn = getattr(creator, "inactivity_warning", None)
     
-    with st.expander(f"👤 {username} - {platform} ({followers:,} Takipçi) | Skor: {score:.1f}/100"):
+    status_icon = "🟢" if is_active else "⚠️ [İNAKTİF]"
+    expander_title = f"{status_icon} 👤 {username} - {platform} ({followers:,} Takipçi) | Skor: {score:.1f}/100"
+    
+    with st.expander(expander_title):
+        if not is_active:
+            warn_text = inactivity_warn or f"Bu profil 2 aydan uzun süredir yeni içerik üretmemiştir (Son paylaşım: {last_post or 'belirsiz'})."
+            st.warning(f"⚠️ **İnaktif Profil Uyarısı:** {warn_text}")
+            
         col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Takipçi", f"{followers:,}")
@@ -29,7 +39,12 @@ def render_creator_card(creator: Any) -> None:
         with col3:
             st.metric("Uygunluk Skoru", f"{score:.1f}/100")
             
-        st.caption("🟢 **Hesap Durumu:** Herkese Açık (Public) • Doğrulanmış Profil")
+        if is_active:
+            last_info = f" • Son İçerik: {last_post}" if last_post else ""
+            st.caption(f"🟢 **Hesap Durumu:** Aktif Üretici • Herkese Açık (Public){last_info}")
+        else:
+            st.caption(f"⚠️ **Hesap Durumu:** İnaktif (2+ aydır içerik yok) • Son İçerik: {last_post or 'Bilinmiyor'}")
+            
         bio = getattr(creator, "bio", "") or "Bilgi yok"
         st.write("📝 **Hakkında (Bio):**", bio[:250] + ("..." if len(bio) > 250 else ""))
         
@@ -67,11 +82,15 @@ def render_results_table(creators: List[Any], depth: int = 1) -> None:
     for i, c in enumerate(creators, 1):
         ca = getattr(c, "content_analysis", None)
         llm_ozet = getattr(ca, "llm_ozet", "") if ca else ""
+        is_active = getattr(c, "is_active", True)
+        last_post = getattr(c, "last_post_date", "-") or "-"
         
         item = {
             "#": i,
             "Kullanıcı Adı": getattr(c, "username", ""),
             "Platform": get_platform_name(c),
+            "Aktivite": "🟢 Aktif" if is_active else "⚠️ İnaktif (2+ ay)",
+            "Son Paylaşım": last_post,
             "Takipçi": getattr(c, "followers", 0) or 0,
             "Etkileşim (%)": round(getattr(c, "engagement_rate", 0.0) or 0.0, 2),
             "Skor": round(getattr(c, "final_score", 0.0) or getattr(c, "score", 0.0) or 0.0, 1),
@@ -117,6 +136,8 @@ def render_download_buttons(creators: List[Any], keyword: str) -> None:
         records.append({
             "Kullanıcı Adı": getattr(c, "username", ""),
             "Platform": get_platform_name(c),
+            "Aktivite Durumu": "Aktif" if getattr(c, "is_active", True) else "İnaktif (2+ aydır içerik yok)",
+            "Son Paylaşım": getattr(c, "last_post_date", "-") or "-",
             "Takipçi": getattr(c, "followers", 0) or 0,
             "Etkileşim Oranı (%)": getattr(c, "engagement_rate", 0.0) or 0.0,
             "Skor": getattr(c, "final_score", 0.0) or getattr(c, "score", 0.0) or 0.0,
