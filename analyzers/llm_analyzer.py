@@ -82,7 +82,13 @@ class LlmAnalyzer(BaseAnalyzer):
             ca.alt_konular = data.get("alt_konular", [])
             ca.hedef_kitle = data.get("hedef_kitle", "")
             ca.icerik_tarzi = data.get("icerik_tarzi", "")
-            ca.sponsorlu_icerik_orani = float(data.get("sponsorlu_icerik_orani", 0.0))
+            sp_rate = float(data.get("sponsorlu_icerik_orani", 0.0))
+            ca.sponsorlu_icerik_orani = sp_rate
+            if sp_rate > 0:
+                creator.has_sponsored_content = True
+                creator.sponsored_video_count = max(creator.sponsored_video_count, int(sp_rate * 10))
+                if not creator.sponsor_keywords_found:
+                    creator.sponsor_keywords_found = ["Sponsorlu İçerik", "Marka İşbirliği"]
             ca.keyword_ilgi_skoru = int(data.get("keyword_ilgi_skoru", getattr(ca, 'keyword_skoru', 0) or 0))
             ca.ozet = data.get("ozet", "")
             

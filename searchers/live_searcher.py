@@ -163,7 +163,9 @@ class LiveSearcher(BaseSearcher):
                         if vc.profile_url not in seen_urls:
                             seen_urls.add(vc.profile_url)
                             all_creators.append(vc)
-                            
+            except Exception as e:
+                logger.debug(f"Arama motoru tabanlı sosyal keşif hatası: {e}")
+
         # 5. YOUTUBE KANALLARI İÇİN ORTALAMA İZLENME (YATAY & SHORTS) VE SPONSORLUK ANALİZİ
         yt_creators = [c for c in all_creators if "youtube" in str(c.platform).lower()]
         if yt_creators:

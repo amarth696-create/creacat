@@ -1,6 +1,6 @@
 """
 İçerik üreticilerinin video performanslarını (yatay video ortalaması ve shorts ortalaması)
-ve ticari işbirliği / sponsorluk (paid promotion, reklam, sponsor) geçmişini analiz eden modül.
+ve ticari işbirliği / sponsorluk (paid promotion, reklam, sponsor, marka ortaklığı) geçmişini analiz eden modül.
 """
 import re
 import json
@@ -15,7 +15,7 @@ HEADERS = {
     "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7"
 }
 
-# Sponsorluk ve reklam tespiti için anahtar kelime ve regex kuralları
+# 1. Sponsorluk ve reklam tespiti için anahtar kelime ve kalıp kuralları
 SPONSOR_PATTERNS = [
     r'#işbirliği\b',
     r'#isbirligi\b',
@@ -24,18 +24,35 @@ SPONSOR_PATTERNS = [
     r'#sponsor\b',
     r'#ad\b',
     r'#paidpromotion\b',
+    r'#işortaklığı\b',
     r'\bişbirliği\b',
     r'\biş birliği\b',
     r'\breklam\b',
     r'\bsponsorlu\b',
+    r'\bsponsorluk\b',
     r'\bortaklığıyla\b',
     r'\bmarka işbirliği\b',
     r'\bindirim kodu\b',
     r'\bkupon kodu\b',
+    r'\bindirim kuponu\b',
     r'\bhediye gönderi\b',
+    r'\bhediye ürün\b',
     r'\bpaid partnership\b',
     r'\bpaid promotion\b',
     r'\bsponsored by\b',
+    r'\btanıtım\b',
+    r'\bkatkılarıyla\b',
+    r'\bdestekleriyle\b',
+    r'\biş ortaklığı\b',
+]
+
+# 2. Türkiye'de en yaygın influencer işbirliği yapan popüler markalar
+POPULAR_BRANDS = [
+    'trendyol', 'hepsiburada', 'yemeksepeti', 'getir', 'mavi', 'defacto', 'lc waikiki',
+    'gratis', 'watsons', 'sephora', 'flormar', 'loreal', 'yves rocher',
+    'dyson', 'philips', 'samsung', 'apple', 'huawei', 'xiaomi', 'arçelik', 'monster',
+    'papara', 'garanti', 'storytel', 'audible', 'nordvpn', 'surfshark', 'cambly', 'open english',
+    'red bull', 'starbucks', 'eti', 'ülker', 'karaca', 'ikea', 'english home', 'decathlon'
 ]
 
 SPONSOR_REGEX = re.compile('|'.join(SPONSOR_PATTERNS), re.IGNORECASE)
@@ -49,6 +66,7 @@ def parse_view_text(text: str) -> int:
     '1,2 Mn' -> 1200000
     '850 görüntüleme' -> 850
     '45K views' -> 45000
+    '1.5M' -> 1500000
     """
     if not text:
         return 0
@@ -80,7 +98,8 @@ def parse_view_text(text: str) -> int:
 
 def detect_sponsorship_in_texts(texts: List[str]) -> Tuple[bool, int, List[str]]:
     """
-    Verilen metin listesinde (video başlıkları, açıklamalar, bio) sponsorluk ve işbirliği sinyallerini tarar.
+    Verilen metin listesinde (video başlıkları, açıklamalar, bio) sponsorluk, reklam
+    ve bilinen marka ortaklığı sinyallerini tarar.
     Döner: (has_sponsored_content, sponsored_count, keywords_found)
     """
     found_keywords = set()
@@ -89,11 +108,25 @@ def detect_sponsorship_in_texts(texts: List[str]) -> Tuple[bool, int, List[str]]
     for t in texts:
         if not t:
             continue
+        text_lower = t.lower()
+        
+        # 1. Regex kural kontrolü (#reklam, işbirliği, indirim kodu vb.)
         matches = SPONSOR_REGEX.findall(t)
+        matched_this_text = False
         if matches:
-            sponsored_count += 1
+            matched_this_text = True
             for m in matches:
-                found_keywords.add(m.strip().lower())
+                clean_m = m.strip().lower()
+                found_keywords.add(clean_m)
+
+        # 2. Popüler sponsor markaları ve link kalıpları kontrolü (örn: "trendyol.com", "link bio'da", "nordvpn.com")
+        for b in POPULAR_BRANDS:
+            if b in text_lower and any(indicator in text_lower for indicator in ['link', 'kod', 'fırsat', 'indirim', 'özel', 'https:', 'http:']):
+                matched_this_text = True
+                found_keywords.add(b.capitalize())
+
+        if matched_this_text:
+            sponsored_count += 1
 
     has_sponsored = (sponsored_count > 0)
     return has_sponsored, sponsored_count, sorted(list(found_keywords))
@@ -108,7 +141,7 @@ class PerformanceAnalyzer:
         YouTube kanal sayfasından:
         1. Son 10 yatay videoyu ve izlenmelerini çeker -> avg_video_views
         2. Son 10 Shorts videosunu ve izlenmelerini çeker -> avg_shorts_views
-        3. Başlıklar üzerinden sponsorluk / reklam tespiti yapar
+        3. Videoların detay açıklamalarından gerçek sponsorluk / reklam tespiti yapar
         """
         result = {
             "avg_video_views": 0,
@@ -123,7 +156,8 @@ class PerformanceAnalyzer:
             return result
 
         clean_ep = channel_endpoint.rstrip('/')
-        all_titles = []
+        all_text_blobs = []
+        video_ids_to_inspect = []
 
         # 1. YATAY VİDEOLAR SEKMENTİ (/videos)
         try:
@@ -142,10 +176,14 @@ class PerformanceAnalyzer:
                             for it in items[:10]:
                                 lvm = it.get('richItemRenderer', {}).get('content', {}).get('lockupViewModel', {})
                                 if lvm:
+                                    cid = lvm.get('contentId')
+                                    if cid and len(video_ids_to_inspect) < 3:
+                                        video_ids_to_inspect.append(cid)
+                                        
                                     meta = lvm.get('metadata', {}).get('lockupMetadataViewModel', {})
                                     title = meta.get('title', {}).get('content')
                                     if title:
-                                        all_titles.append(title)
+                                        all_text_blobs.append(title)
                                         result["recent_video_titles"].append(title)
                                     rows = meta.get('metadata', {}).get('contentMetadataViewModel', {}).get('metadataRows', [])
                                     for row in rows:
@@ -182,7 +220,7 @@ class PerformanceAnalyzer:
                                 if slvm:
                                     title = slvm.get('overlayMetadata', {}).get('primaryText', {}).get('content')
                                     if title:
-                                        all_titles.append(title)
+                                        all_text_blobs.append(title)
                                     view_text = slvm.get('overlayMetadata', {}).get('secondaryText', {}).get('content')
                                     if view_text:
                                         s_views = parse_view_text(view_text)
@@ -194,9 +232,27 @@ class PerformanceAnalyzer:
         except Exception as e:
             logger.debug(f"Shorts analiz hatası ({channel_endpoint}): {e}")
 
-        # 3. SPONSORLUK VE İŞBİRLİĞİ TESPİTİ
-        if all_titles:
-            has_sp, count_sp, kws = detect_sponsorship_in_texts(all_titles)
+        # 3. VİDEO AÇIKLAMALARINDAN DERİN SPONSORLUK VE REKLAM TESPİTİ
+        # YouTuber'lar sponsorlukları genellikle başlığa değil açıklama kısmına yazar
+        for vid in video_ids_to_inspect:
+            try:
+                v_url = f"https://www.youtube.com/watch?v={vid}"
+                r_v = requests.get(v_url, headers=HEADERS, timeout=3)
+                if r_v.status_code == 200:
+                    desc_matches = re.findall(r'"shortDescription":"(.*?)"', r_v.text)
+                    if desc_matches:
+                        raw_desc = desc_matches[0]
+                        try:
+                            clean_desc = raw_desc.encode('utf-8').decode('unicode_escape')
+                        except Exception:
+                            clean_desc = raw_desc
+                        all_text_blobs.append(clean_desc)
+            except Exception:
+                pass
+
+        # 4. SPONSORLUK ANALİZİNİ ÇALIŞTIR
+        if all_text_blobs:
+            has_sp, count_sp, kws = detect_sponsorship_in_texts(all_text_blobs)
             result["has_sponsored_content"] = has_sp
             result["sponsored_video_count"] = count_sp
             result["sponsor_keywords_found"] = kws
