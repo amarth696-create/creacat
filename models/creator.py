@@ -52,6 +52,7 @@ class Creator:
     has_sponsored_content: bool = False
     sponsored_video_count: int = 0
     sponsor_keywords_found: List[str] = field(default_factory=list)
+    collaborated_brands: List[str] = field(default_factory=list)
     engagement_rate: float = 0.0
     content_analysis: Optional[ContentAnalysis] = None
     final_score: float = 0.0

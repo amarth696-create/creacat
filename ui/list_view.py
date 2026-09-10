@@ -111,15 +111,14 @@ def render_standalone_list_page(
     st.markdown(f"##### 📊 Detaylı Tablo ({len(filtered_creators)} / {len(creators)} Üretici)")
     render_results_table(filtered_creators, depth=settings.get("depth", 3))
 
-    # 6. PROFİL KARTLARI (EXPANDER FORMATINDA İNCELEME)
+    # 6. PROFİL KARTLARI (OPSİYONEL EXPANDER FORMATI)
     st.markdown("---")
-    st.markdown("##### 🔍 Profil Detayları & İçerik Analizleri")
-    
-    col_left, col_right = st.columns(2)
-    for idx, c in enumerate(filtered_creators):
-        target_col = col_left if idx % 2 == 0 else col_right
-        with target_col:
-            render_creator_card(c)
+    with st.expander("🔍 Tekil Profil Kartlarını & Detaylı İçeriklerini İncele", expanded=False):
+        col_left, col_right = st.columns(2)
+        for idx, c in enumerate(filtered_creators):
+            target_col = col_left if idx % 2 == 0 else col_right
+            with target_col:
+                render_creator_card(c)
 
     # Alt Kısım Sohbete Geri Dön Butonu
     st.markdown("---")

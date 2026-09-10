@@ -15,19 +15,37 @@ HEADERS = {
     "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7"
 }
 
-# 1. Sponsorluk ve reklam tespiti için anahtar kelime ve kalıp kuralları
+# 1. Sponsorluk ve reklam tespiti için anahtar kelime ve kalıp kuralları (Nano Tool / Nabulu entegrasyonu)
 SPONSOR_PATTERNS = [
     r'#işbirliği\b',
     r'#isbirligi\b',
     r'#reklam\b',
+    r'#reklamiçermektedir\b',
+    r'#reklamicermektedir\b',
     r'#sponsorlu\b',
     r'#sponsor\b',
+    r'#sponsored\b',
     r'#ad\b',
     r'#paidpromotion\b',
+    r'#paidpartnership\b',
     r'#işortaklığı\b',
+    r'#tanıtım\b',
+    r'#tanitim\b',
+    r'#hediye\b',
+    r'#gifted\b',
+    r'#partnership\b',
+    r'#partner\b',
+    r'#collab\b',
+    r'#collaboration\b',
+    r'#brandpartner\b',
+    r'#brandambassador\b',
+    r'#markaisbirligi\b',
+    r'#markaisbirliği\b',
     r'\bişbirliği\b',
     r'\biş birliği\b',
+    r'\bişbirliğiyle\b',
     r'\breklam\b',
+    r'\breklam içermektedir\b',
     r'\bsponsorlu\b',
     r'\bsponsorluk\b',
     r'\bortaklığıyla\b',
@@ -44,15 +62,17 @@ SPONSOR_PATTERNS = [
     r'\bkatkılarıyla\b',
     r'\bdestekleriyle\b',
     r'\biş ortaklığı\b',
+    r'\bkodumu kullan\b',
 ]
 
-# 2. Türkiye'de en yaygın influencer işbirliği yapan popüler markalar
+# 2. Türkiye'de en yaygın influencer işbirliği yapan popüler markalar (Nano Tool Marka Kataloğu)
 POPULAR_BRANDS = [
-    'trendyol', 'hepsiburada', 'yemeksepeti', 'getir', 'mavi', 'defacto', 'lc waikiki',
-    'gratis', 'watsons', 'sephora', 'flormar', 'loreal', 'yves rocher',
-    'dyson', 'philips', 'samsung', 'apple', 'huawei', 'xiaomi', 'arçelik', 'monster',
-    'papara', 'garanti', 'storytel', 'audible', 'nordvpn', 'surfshark', 'cambly', 'open english',
-    'red bull', 'starbucks', 'eti', 'ülker', 'karaca', 'ikea', 'english home', 'decathlon'
+    'trendyol', 'hepsiburada', 'yemeksepeti', 'getir', 'mavi', 'defacto', 'lc waikiki', 'beymen', 'boyner', 'zara',
+    'gratis', 'watsons', 'sephora', 'flormar', 'loreal', "l'oréal", 'yves rocher', 'avon',
+    'dyson', 'philips', 'samsung', 'apple', 'huawei', 'xiaomi', 'arçelik', 'monster notebook', 'monster',
+    'papara', 'garanti bbva', 'garanti', 'storytel', 'audible', 'nordvpn', 'surfshark', 'cambly', 'open english',
+    'red bull', 'starbucks', 'eti', 'ülker', 'coca-cola', 'karaca', 'ikea', 'english home', 'madame coco', 'paşabahçe', 'decathlon',
+    'nike', 'adidas', 'puma'
 ]
 
 SPONSOR_REGEX = re.compile('|'.join(SPONSOR_PATTERNS), re.IGNORECASE)
@@ -98,38 +118,51 @@ def parse_view_text(text: str) -> int:
 
 def detect_sponsorship_in_texts(texts: List[str]) -> Tuple[bool, int, List[str]]:
     """
-    Verilen metin listesinde (video başlıkları, açıklamalar, bio) sponsorluk, reklam
+    Verilen metin listesinde (video başlıkları, açıklamalar, bio, etiketler) sponsorluk, reklam
     ve bilinen marka ortaklığı sinyallerini tarar.
-    Döner: (has_sponsored_content, sponsored_count, keywords_found)
+    Döner: (has_sponsored_content, sponsored_count, keywords_and_brands_found)
     """
     found_keywords = set()
+    found_brands = set()
     sponsored_count = 0
 
     for t in texts:
         if not t:
             continue
         text_lower = t.lower()
-        
-        # 1. Regex kural kontrolü (#reklam, işbirliği, indirim kodu vb.)
-        matches = SPONSOR_REGEX.findall(t)
         matched_this_text = False
+        
+        # 1. Regex kural kontrolü (#reklam, #işbirliği, indirim kodu vb.)
+        matches = SPONSOR_REGEX.findall(t)
         if matches:
             matched_this_text = True
             for m in matches:
                 clean_m = m.strip().lower()
                 found_keywords.add(clean_m)
 
-        # 2. Popüler sponsor markaları ve link kalıpları kontrolü (örn: "trendyol.com", "link bio'da", "nordvpn.com")
+        # 2. Popüler sponsor markaları kontrolü
         for b in POPULAR_BRANDS:
-            if b in text_lower and any(indicator in text_lower for indicator in ['link', 'kod', 'fırsat', 'indirim', 'özel', 'https:', 'http:']):
-                matched_this_text = True
-                found_keywords.add(b.capitalize())
+            if b in text_lower:
+                has_ad_signal = any(indicator in text_lower for indicator in ['link', 'kod', 'fırsat', 'indirim', 'özel', 'https:', 'http:', 'ile', '#', '@'])
+                if has_ad_signal or matched_this_text:
+                    matched_this_text = True
+                    found_brands.add(b.title())
+
+        # 3. @mention kontrolleri (örn: @trendyolcom, @sephoraturkiye)
+        mentions = re.findall(r'@([\w.]+)', t)
+        for m in mentions:
+            m_low = m.lower()
+            for b in POPULAR_BRANDS:
+                if b in m_low:
+                    matched_this_text = True
+                    found_brands.add(f"@{m}")
 
         if matched_this_text:
             sponsored_count += 1
 
-    has_sponsored = (sponsored_count > 0)
-    return has_sponsored, sponsored_count, sorted(list(found_keywords))
+    all_kws = sorted(list(found_brands)) + sorted(list(found_keywords))
+    has_sponsored = (sponsored_count > 0) or (len(all_kws) > 0)
+    return has_sponsored, sponsored_count, all_kws
 
 
 class PerformanceAnalyzer:

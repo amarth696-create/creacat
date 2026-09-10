@@ -293,35 +293,42 @@ def main():
     for m_idx, msg in enumerate(chat_history):
         with st.chat_message(msg["role"]):
             content_to_show = msg.get("content", "")
-            # Eski kayıtlarda kalmış uzun metin listelerini temizle ve şık yönlendirme kartına çevir
-            if "Konusunda İçerikleri Doğrulanan En Uygun Üreticiler" in content_to_show or ("### 🎯" in content_to_show and "\n1. " in content_to_show):
-                res_kw = msg.get("keyword", "")
-                c_cnt = len(msg.get("results", [])) if msg.get("results") else ""
+            res_list = msg.get("results") or []
+            res_kw = msg.get("keyword", "")
+            
+            # İçerik üretici dökümü veya sonuç içeren mesaj tespiti (Asla chat akışında liste/kart dökme!)
+            is_creator_text_dump = (
+                bool(res_list)
+                or bool(re.search(r'(?:\n|^)\s*\d+\.\s+[@\w]', content_to_show))
+                or "Aktif Üretici" in content_to_show
+                or "İçerikleri Doğrulanan" in content_to_show
+                or ("Takipçi:" in content_to_show and "Etkileşim:" in content_to_show)
+            )
+            
+            if is_creator_text_dump and msg.get("role") == "assistant":
+                c_cnt = len(res_list) if res_list else ""
                 cnt_str = f"**{c_cnt} içerik üreticisi**" if c_cnt else "içerik üreticileri"
-                content_to_show = (
-                    f"🎯 **'{res_kw.title() if res_kw else 'Arama'}'** konusu için kriterlere uygun {cnt_str} bulundu ve performansları analiz edildi.\n\n"
-                    f"👉 **<Listen burada: [Tam Ekran Liste Sayfasını Aç](?view=list)>**\n\n"
-                    f"*Detaylı metrik tablosu, etkileşim/izlenme oranları ve Excel indirme seçenekleri liste sayfasında sunulmaktadır.*"
-                )
-            st.markdown(content_to_show)
-            if "results" in msg and msg["results"]:
-                res_list = msg["results"]
-                res_kw = msg.get("keyword", "")
-                c_cnt = len(res_list)
+                kw_title = res_kw.title() if res_kw else "Arama"
                 
-                # Chat akışını boğmamak için temiz yönlendirme kartı
                 with st.container():
+                    st.markdown(
+                        f"🎯 **'{kw_title}'** araması başarıyla tamamlandı. Kriterlere uygun {cnt_str} bulundu ve detaylı performans & işbirliği analizleri hazırlandı.\n\n"
+                        f"*Detaylı metrik tablosu, son 12 video ortalama izlenmeleri ve işbirlikleri tablo sayfasında sunulmaktadır.*"
+                    )
                     col_info, col_btn = st.columns([3, 1.5])
                     with col_info:
-                        st.markdown(f"📊 **{c_cnt} İçerik Üreticisi Bulundu** — Detaylı analizler, filtreler ve indirme seçenekleri liste sayfasında.")
+                        st.caption("📊 Tüm metrikler, etkileşimler ve Excel/CSV indirme seçenekleri tam ekran tabloda.")
                     with col_btn:
-                        if st.button("📋 Listeyi Görüntüle", key=f"btn_view_page_{m_idx}", type="primary", use_container_width=True):
-                            st.session_state["last_search_results"] = res_list
+                        if st.button("📋 Sonuçları Tabloda Aç", key=f"btn_view_page_{m_idx}", type="primary", use_container_width=True):
+                            if res_list:
+                                st.session_state["last_search_results"] = res_list
                             st.session_state["last_search_keyword"] = res_kw
-                            st.session_state["current_list_title"] = f"'{res_kw.title()}' Arama Listesi" if res_kw else "İçerik Üreticileri"
+                            st.session_state["current_list_title"] = f"'{kw_title}' Arama Tablosu"
                             st.session_state["view_mode"] = "list"
                             st.query_params["view"] = "list"
                             st.rerun()
+            else:
+                st.markdown(content_to_show)
             
     # 6. KULLANICI GİRDİSİ VE CEVAP ÜRETİMİ
     prompt = st.chat_input("Hangi konuda influencer arıyorsunuz?")
@@ -373,21 +380,15 @@ def main():
                             pass
 
                     clean_summary = (
-                        f"🎯 **'{kw.title()}'** konusu için kriterlere uygun **{len(results)} içerik üreticisi** bulundu ve performansları analiz edildi.\n\n"
-                        f"👉 **<Listen burada: [Tam Ekran Liste Sayfasını Aç](?view=list)>**\n\n"
-                        f"*Detaylı metrik tablosu, etkileşim/izlenme oranları ve Excel indirme seçenekleri liste sayfasında sunulmaktadır.*"
+                        f"🎯 **'{kw.title()}'** araması için kriterlere uygun **{len(results)} içerik üreticisi** bulundu ve performans/işbirliği analizleri tamamlandı.\n\n"
+                        f"👉 **Sonuçlar tam ekran tablo sayfasına aktarılıyor...**\n"
+                        f"*([Tabloyu hemen açmak için tıklayın](?view=list))*"
                     )
                     st.markdown(clean_summary)
                     
-                    col_view_now, _ = st.columns([1.5, 3])
-                    with col_view_now:
-                        if st.button("📋 Listeyi Tam Sayfada Aç", key="btn_view_page_live", type="primary", use_container_width=True):
-                            st.session_state["view_mode"] = "list"
-                            st.query_params["view"] = "list"
-                            st.rerun()
-                    
-                    # Otomatik yönlendirme: Listeye doğrudan geçiş yap
+                    # Otomatik yönlendirme: Tablo sayfasına doğrudan geçiş yap
                     st.session_state["view_mode"] = "list"
+                    st.session_state["current_list_title"] = f"'{kw.title()}' Arama Tablosu"
                     st.query_params["view"] = "list"
                     
                     saved_content = clean_summary
@@ -410,7 +411,7 @@ def main():
             set_state("chat_history", history)
             
             if active_chat_id:
-                ChatStorage.add_message(active_chat_id, "assistant", saved_content, results=results)
+                ChatStorage.add_message(active_chat_id, "assistant", saved_content, results=results, keyword=kw)
 
             if results:
                 st.rerun()

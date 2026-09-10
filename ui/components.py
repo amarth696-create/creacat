@@ -106,29 +106,43 @@ def render_results_table(creators: List[Any], depth: int = 1) -> None:
         
         has_sp = getattr(c, "has_sponsored_content", False)
         sp_cnt = getattr(c, "sponsored_video_count", 0)
+        sp_kws = getattr(c, "sponsor_keywords_found", []) or []
+        brands = getattr(c, "collaborated_brands", []) or []
+        collab_tags = sorted(list(set(brands + sp_kws)))
+        collab_text = ", ".join(collab_tags[:4]) if collab_tags else ("Ticari İşbirliği Var" if has_sp else "-")
+
         v_views = getattr(c, "avg_video_views", 0) or 0
         s_views = getattr(c, "avg_shorts_views", 0) or 0
         
         item = {
             "#": i,
-            "Kullanıcı Adı": getattr(c, "username", ""),
+            "Kullanıcı Adı": f"@{getattr(c, 'username', '')}",
             "Platform": get_platform_name(c),
-            "Aktivite": "🟢 Aktif" if is_active else "⚠️ İnaktif (2+ ay)",
+            "Aktivite": "🟢 Aktif" if is_active else "⚠️ İnaktif",
             "Takipçi": getattr(c, "followers", 0) or 0,
-            "Yatay İzlenme": f"{v_views:,}" if v_views > 0 else "-",
-            "Shorts İzlenme": f"{s_views:,}" if s_views > 0 else "-",
-            "İşbirliği": f"🤝 Var ({sp_cnt})" if has_sp else "🌿 Organik",
+            "Son 12 Yatay Ort.": f"{v_views:,}" if v_views > 0 else "-",
+            "Son 12 Shorts Ort.": f"{s_views:,}" if s_views > 0 else "-",
+            "İşbirliği Durumu": f"🤝 Ticari İşbirliği ({sp_cnt})" if has_sp else "🌿 Organik",
+            "İşbirliği Markaları / Etiketler": collab_text,
             "Etkileşim (%)": round(getattr(c, "engagement_rate", 0.0) or 0.0, 2),
             "Skor": round(getattr(c, "final_score", 0.0) or getattr(c, "score", 0.0) or 0.0, 1),
             "Profil URL": getattr(c, "profile_url", "")
         }
-        if depth >= 3:
-            item["AI Özeti"] = llm_ozet[:80] + "..." if len(llm_ozet) > 80 else llm_ozet
+        if depth >= 3 and llm_ozet:
+            item["AI Analizi"] = llm_ozet[:90] + "..." if len(llm_ozet) > 90 else llm_ozet
             
         data.append(item)
         
     df = pd.DataFrame(data)
-    st.dataframe(df, use_container_width=True)
+    st.dataframe(
+        df, 
+        use_container_width=True,
+        column_config={
+            "Profil URL": st.column_config.LinkColumn("Profil Linki", display_text="Profili Aç ↗️"),
+            "Takipçi": st.column_config.NumberColumn("Takipçi", format="%d"),
+            "Skor": st.column_config.NumberColumn("Uygunluk Skoru", format="%.1f / 100")
+        }
+    )
 
 def render_summary_metrics(creators: List[Any]) -> None:
     """Arama sonuçlarının genel istatistiklerini gösterir."""

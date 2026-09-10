@@ -175,6 +175,15 @@ Yalnızca tek bir kelimeye ('{keyword}') takılıp kalma! Otomatik türetilen il
    - 3 aydan uzun süredir yeni içerik üretmeyen (inaktif) profilleri KESİNLİKLE LİSTELEME.
    - 'last_post_date': Bu üreticinin son videosunun veya gönderisinin zamanı (örn: '2 gün önce', '1 hafta önce', '2 ay önce').
    - 'is_active': Üretici son 2 ay içinde aktif içerik ürettiyse true, 2 aydan uzun süredir içerik üretmiyorsa (inaktif ise) false yap. (Not: 3 aydan eski hesaplar zaten listelenmeyecektir).
+6. TİCARİ İŞBİRLİĞİ VE MARKA SPONSORLUĞU (ÇOK ÖNEMLİ):
+   - Bu üretici bugüne kadar herhangi bir ticari marka ortaklığı, reklam, sponsorlu video veya paid partnership (#reklam, #işbirliği, indirim kodu, hediye ürün, marka işbirliği vb.) yapmış mı?
+   - 'has_sponsored_content': true / false
+   - 'sponsored_video_count': Tespit edilen sponsorlu video / gönderi sayısı (tam sayı)
+   - 'collaborated_brands': İşbirliği yaptığı tespit edilen veya bilinen markalar (Örn: ["Trendyol", "Philips", "Dyson", "Getir", "Samsung"] veya [])
+   - 'sponsor_keywords_found': Tespit edilen anahtar kelimeler ve etiketler (Örn: ["#işbirliği", "Trendyol", "indirim kodu"])
+7. İZLENME METRİKLERİ (SON 12 İÇERİK BAZLI):
+   - 'avg_video_views': Son 12 yatay videosunun ortalama izlenme sayısı (tam sayı)
+   - 'avg_shorts_views': Son 12 Shorts / Reels videosunun ortalama izlenme sayısı (tam sayı)
 
 YANIT FORMATI:
 SADECE aşağıdaki JSON formatında geçerli bir JSON listesi döndür. Kesinlikle markdown kod bloğu olmadan saf JSON ver:
@@ -188,6 +197,12 @@ SADECE aşağıdaki JSON formatında geçerli bir JSON listesi döndür. Kesinli
     "is_private": false,
     "is_active": true,
     "last_post_date": "1 hafta önce",
+    "avg_video_views": 18000,
+    "avg_shorts_views": 35000,
+    "has_sponsored_content": true,
+    "sponsored_video_count": 3,
+    "collaborated_brands": ["Trendyol", "Philips"],
+    "sponsor_keywords_found": ["#işbirliği", "Trendyol", "indirim kodu"],
     "bio": "Profil biyografi metni",
     "recent_contents": [
       "Örnek İçerik 1: Üniversite Vize Haftası Rutinim ve Tavsiyeler",
@@ -273,6 +288,13 @@ Türkiye'de '{keyword}' konusunda (ve ilişkili: {', '.join(related_kws[:6]) if 
    - 3 aydan uzun süredir yeni içerik üretmeyen (inaktif) profilleri KESİNLİKLE LİSTELEME.
    - 'last_post_date': Bu üreticinin son videosunun veya gönderisinin yaklaşık zamanı (örn: '2 gün önce', '1 hafta önce', '2 ay önce').
    - 'is_active': Üretici son 2 ay içinde aktif içerik ürettiyse true, 2 aydan uzun süredir içerik üretmiyorsa (inaktif ise) false yap. (Not: 3 aydan eski hesaplar listelenmeyecektir).
+7. TİCARİ İŞBİRLİĞİ VE İZLENME METRİKLERİ:
+   - 'has_sponsored_content': true / false (Marka işbirliği/reklam yapmış mı?)
+   - 'sponsored_video_count': Tespit edilen sponsorlu video sayısı
+   - 'collaborated_brands': İşbirliği yaptığı markalar (Örn: ["Trendyol", "Gratis", "Getir"])
+   - 'sponsor_keywords_found': Etiket ve anahtar kelimeler
+   - 'avg_video_views': Son 12 video ortalama izlenmesi (tam sayı)
+   - 'avg_shorts_views': Son 12 Reels / Shorts ortalama izlenmesi (tam sayı)
 
 YANIT FORMATI:
 SADECE aşağıdaki JSON formatında geçerli bir JSON listesi döndür (kesinlikle markdown kod bloğu olmadan saf JSON):
@@ -286,6 +308,12 @@ SADECE aşağıdaki JSON formatında geçerli bir JSON listesi döndür (kesinli
     "is_private": false,
     "is_active": true,
     "last_post_date": "1 hafta önce",
+    "avg_video_views": 15000,
+    "avg_shorts_views": 28000,
+    "has_sponsored_content": true,
+    "sponsored_video_count": 2,
+    "collaborated_brands": ["Trendyol", "Gratis"],
+    "sponsor_keywords_found": ["#işbirliği", "Trendyol"],
     "bio": "Profil biyografisi",
     "recent_contents": ["İçerik 1", "İçerik 2"],
     "content_review": "Bu hesap {keyword} konusunda aktif ve eğitici paylaşımlar yapmaktadır.",
@@ -377,6 +405,11 @@ SADECE aşağıdaki JSON formatında geçerli bir JSON listesi döndür (kesinli
                 c.has_sponsored_content = bool(item.get("has_sponsored_content", False))
                 c.sponsored_video_count = int(item.get("sponsored_video_count", 0))
                 c.sponsor_keywords_found = item.get("sponsor_keywords_found", []) or []
+                brands = item.get("collaborated_brands", []) or []
+                c.collaborated_brands = brands
+                if brands:
+                    c.has_sponsored_content = True
+                    c.sponsor_keywords_found = sorted(list(set(c.sponsor_keywords_found + brands)))
 
                 # İçerik başlıklarında sponsorluk taraması yap
                 from analyzers.performance_analyzer import detect_sponsorship_in_texts
@@ -384,7 +417,7 @@ SADECE aşağıdaki JSON formatında geçerli bir JSON listesi döndür (kesinli
                 has_sp, sp_cnt, kws = detect_sponsorship_in_texts(all_text_blobs)
                 if has_sp:
                     c.has_sponsored_content = True
-                    c.sponsored_video_count = max(c.sponsored_video_count, sp_cnt)
+                    c.sponsored_video_count = max(c.sponsored_video_count, sp_cnt or 1)
                     c.sponsor_keywords_found = sorted(list(set(c.sponsor_keywords_found + kws)))
 
                 # İçerik analiz özetini oluştur
