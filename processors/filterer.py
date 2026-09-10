@@ -64,6 +64,18 @@ class Filterer:
         if getattr(creator, 'is_private', False):
             return False
             
+        # 3 aydan uzun süredir içerik üretmeyen inaktif profilleri ASLA dahil etme
+        if getattr(creator, 'is_excluded_for_inactivity', False):
+            return False
+            
+        # Eğer henüz is_excluded_for_inactivity hesaplanmamışsa ama last_post_date varsa kontrol et
+        last_p = getattr(creator, 'last_post_date', None)
+        if last_p:
+            from utils.activity import evaluate_activity_status
+            _, _, _, is_exc = evaluate_activity_status(last_p)
+            if is_exc:
+                return False
+
         if not filters:
             return True
             

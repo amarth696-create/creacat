@@ -254,6 +254,10 @@ class LiveSearcher(BaseSearcher):
                         # Aktivite durumunu ve son içerik tarihini değerlendir
                         creator.set_activity(time_text=pub_time or "Son 1 ay içinde aktif")
                         
+                        # 3 aydan uzun süredir inaktif ise listeye dahil etme
+                        if creator.is_excluded_for_inactivity:
+                            continue
+                        
                         date_str = f" • {pub_time}" if pub_time else ""
                         creator.recent_contents = [
                             f"Son Video: {vid_title} ({view_text}{date_str})",

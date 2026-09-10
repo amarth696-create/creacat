@@ -179,9 +179,10 @@ def execute_search(params, settings):
     unique_creators = deduplicator.deduplicate(enriched)
     filtered = filterer.filter(unique_creators)
     
-    # Eğer katı filtreler sonucu 0'a indirdiyse, bulunan en uygun profilleri koru
+    # Eğer katı filtreler sonucu 0'a indirdiyse, gizli olmayan ve 3 aydan eski olmayan profilleri koru
     if not filtered and unique_creators:
-        filtered = unique_creators[:Config.DEFAULT_LIMIT]
+        valid_pool = [c for c in unique_creators if not getattr(c, 'is_private', False) and not getattr(c, 'is_excluded_for_inactivity', False)]
+        filtered = valid_pool[:Config.DEFAULT_LIMIT]
 
     # Analiz
     analyzed = []
