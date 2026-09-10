@@ -271,6 +271,7 @@ def main():
             for m in reversed(msgs):
                 if m.get("results"):
                     active_results = m["results"]
+                    active_kw = m.get("keyword", active_kw)
                     break
                     
         render_standalone_list_page(
@@ -291,7 +292,18 @@ def main():
     chat_history = get_state("chat_history") or []
     for m_idx, msg in enumerate(chat_history):
         with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
+            content_to_show = msg.get("content", "")
+            # Eski kayıtlarda kalmış uzun metin listelerini temizle ve şık yönlendirme kartına çevir
+            if "Konusunda İçerikleri Doğrulanan En Uygun Üreticiler" in content_to_show or ("### 🎯" in content_to_show and "\n1. " in content_to_show):
+                res_kw = msg.get("keyword", "")
+                c_cnt = len(msg.get("results", [])) if msg.get("results") else ""
+                cnt_str = f"**{c_cnt} içerik üreticisi**" if c_cnt else "içerik üreticileri"
+                content_to_show = (
+                    f"🎯 **'{res_kw.title() if res_kw else 'Arama'}'** konusu için kriterlere uygun {cnt_str} bulundu ve performansları analiz edildi.\n\n"
+                    f"👉 **<Listen burada: [Tam Ekran Liste Sayfasını Aç](?view=list)>**\n\n"
+                    f"*Detaylı metrik tablosu, etkileşim/izlenme oranları ve Excel indirme seçenekleri liste sayfasında sunulmaktadır.*"
+                )
+            st.markdown(content_to_show)
             if "results" in msg and msg["results"]:
                 res_list = msg["results"]
                 res_kw = msg.get("keyword", "")

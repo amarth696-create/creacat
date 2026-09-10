@@ -173,7 +173,7 @@ class PerformanceAnalyzer:
                         if 'content' in tab_r:
                             items = tab_r['content'].get('richGridRenderer', {}).get('contents', [])
                             video_views = []
-                            for it in items[:10]:
+                            for it in items[:12]:
                                 lvm = it.get('richItemRenderer', {}).get('content', {}).get('lockupViewModel', {})
                                 if lvm:
                                     cid = lvm.get('contentId')
@@ -214,7 +214,7 @@ class PerformanceAnalyzer:
                         if 'content' in tab_r:
                             items = tab_r['content'].get('richGridRenderer', {}).get('contents', [])
                             shorts_views = []
-                            for it in items[:10]:
+                            for it in items[:12]:
                                 content_obj = it.get('richItemRenderer', {}).get('content', {})
                                 slvm = content_obj.get('shortsLockupViewModel')
                                 if slvm:

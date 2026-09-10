@@ -42,10 +42,17 @@ class ChatStorage:
                 role TEXT NOT NULL,
                 content TEXT NOT NULL,
                 results_json TEXT,
+                keyword TEXT,
                 created_at TEXT NOT NULL,
                 FOREIGN KEY (conversation_id) REFERENCES chat_conversations(id) ON DELETE CASCADE
             )
         """)
+        # Migration: Add keyword column if missing from existing table
+        try:
+            cursor.execute("ALTER TABLE chat_messages ADD COLUMN keyword TEXT")
+        except Exception:
+            pass
+            
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS saved_lists (
                 id TEXT PRIMARY KEY,
@@ -115,7 +122,7 @@ class ChatStorage:
         ]
 
     @classmethod
-    def add_message(cls, conversation_id: str, role: str, content: str, results: Optional[List[Any]] = None) -> None:
+    def add_message(cls, conversation_id: str, role: str, content: str, results: Optional[List[Any]] = None, keyword: Optional[str] = None) -> None:
         """Sohbete yeni bir mesaj (ve varsa bulunan influencer sonuçlarını) ekler."""
         conn = cls.get_db_connection()
         cursor = conn.cursor()
@@ -133,9 +140,9 @@ class ChatStorage:
             results_json = json.dumps(serializable, ensure_ascii=False)
             
         cursor.execute("""
-            INSERT INTO chat_messages (id, conversation_id, role, content, results_json, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, (msg_id, conversation_id, role, content, results_json, now_str))
+            INSERT INTO chat_messages (id, conversation_id, role, content, results_json, keyword, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (msg_id, conversation_id, role, content, results_json, keyword, now_str))
         
         # Sohbetin updated_at tarihini güncelle
         cursor.execute("""
@@ -153,7 +160,7 @@ class ChatStorage:
         conn = cls.get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT role, content, results_json, created_at
+            SELECT role, content, results_json, keyword, created_at
             FROM chat_messages
             WHERE conversation_id = ?
             ORDER BY created_at ASC
@@ -164,10 +171,11 @@ class ChatStorage:
         
         messages = []
         for r in rows:
-            role, content, results_json, created_at = r
+            role, content, results_json, kw, created_at = r
             msg_obj = {
                 "role": role,
                 "content": content,
+                "keyword": kw,
                 "created_at": created_at
             }
             if results_json:

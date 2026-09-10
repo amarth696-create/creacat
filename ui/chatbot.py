@@ -149,47 +149,57 @@ class ChatBot:
         """Gemini kullanarak mesajın ve konuşma bağlamının niyetini çıkarır."""
         prompt = f"""
 Sen Türkçe konuşan profesyonel bir sosyal medya içerik üreticisi (influencer) keşif uzmanısın.
+Sistemimizde sol kenar çubuğundaki filtreler tamamen kaldırılmıştır; filtreleme artık seninle kullanıcı arasındaki bu sohbet üzerinden yönetilmektedir.
 
-KENAR ÇUBUĞU (SIDEBAR) AKTİF AYARLARI:
-Kullanıcı sol kenar çubuğunda filtrelerini zaten ayarlamıştır:
-- Platformlar: {context.get('platforms')}
-- Minimum Takipçi: {context.get('min_followers')}
-- Maksimum Takipçi: {context.get('max_followers') or 'Sınırsız'}
-- Ülke: {context.get('country')}
-- Dil: {context.get('language')}
-
-ÇOK ÖNEMLİ KURALLAR:
-1. KENAR ÇUBUĞU AYARLARINI TEKRAR SORMA:
-   Kullanıcı platformları ve takipçi aralığını sol menüde zaten belirlemiştir. Kullanıcıya 'hangi platform?', 'bütçeniz/takipçi aralığınız nedir?' gibi sol menüde zaten seçili olan filtreleri ASLA TEKRAR SORMA.
-2. DİYALOG BAĞLAMI VE SORU-CEVAP:
-   Kullanıcının son mesajı önceki konuşmanın veya bir sorun varsa onun yanıtı olabilir. Konuşma geçmişini ve son mesajı birlikte değerlendir.
-3. ARAMA KARARI ('action': 'search'):
-   - Eğer kullanıcının mesajında veya konuşma akışında bir hedef kitle, niş, sektör veya konu (örneğin 'üniversite öğrencileri', 'yks hazırlık', 'fitness', 'yazılım', 'gezi') varsa aksiyonu 'search' yap.
-   - 'keyword': Sosyal medya platformlarında (YouTube, Instagram, TikTok) arama yapmak için kullanılacak EN NET, EN KISA arama kelimesini veya tamlamasını çıkar.
-     * DOĞRU KEYWORD: 'üniversite öğrencileri', 'fitness', 'yks', 'yazılım'
-     * KESİNLİKLE YASAK: Kullanıcının konuşma cümlesini ('platformlara homojen şekilde ağırlık ver...', 'kişileri arıyorum', 'hedef kitlem', 'istiyorum', 'bana bul') keyword içine KOYMA! Yalnızca aranacak öz konuyu yaz.
-   - 'min_followers': Kullanıcı mesajında özel olarak yeni bir sayı belirttiyse onu al, yoksa kenar çubuğundaki ({context.get('min_followers')}) değerini kullan.
-   - 'max_followers': Kullanıcı mesajında özel olarak üst sınır belirttiyse onu al, yoksa kenar çubuğundaki ({context.get('max_followers') or 'null'}) değerini kullan.
-   - 'reply_text': Kullanıcıya chat ekranında gösterilecek kısa, kibar Türkçe onay cümlesi. Kullanıcının aradığı konuya ek olarak sistemin bu konuyla ilgili türettiği alt başlıkları da (ör: 'üniversite hayatı, study with me, yks hazırlık, ders çalışma') tarayacağını belirten samimi bir cümle kur.
-4. SOHBET KARARI ('action': 'chat'):
-   - Yalnızca kullanıcı sadece 'merhaba', 'selam', 'nasılsın' dediğinde ve aranacak hiçbir konu/kategori yoksa kullan.
-   - 'reply_text': Samimi Türkçe yanıt. Kenar çubuğundaki filtrelerin farkında olduğunu hissettir.
-
-Önceki Sohbet Geçmişi:
+SOHBET GEÇMİŞİ:
 {history_str if history_str else '(Henüz geçmiş yok)'}
 
-Kullanıcının Son Mesajı:
+KULLANICININ SON MESAJI:
 {user_message}
+
+GÖREVLERİN VE MANTIK AKIŞI:
+1. SOHBET GEÇMİŞİNİ VE SON MESAJI BİRLİKTE ANALİZ ET:
+   - Aranmak istenen bir kategori, konu veya niş var mı? (Örn: 'dizi ve filmler', 'seyahat', 'teknoloji', 'üniversite öğrencileri', 'fitness')
+   - Kullanıcı platform belirtti mi? (YouTube, Instagram, TikTok veya 'hepsi / tümü / fark etmez')
+   - Kullanıcı takipçi aralığı/büyüklüğü belirtti mi? (Örn: '10k+', '50k-200k', 'mikro', 'makro', veya 'fark etmez / hepsi / sınırsız')
+
+2. EKSİK FİLTRE VE SORU SORMA KURALI ('action': 'clarify'):
+   - Eğer kullanıcı bir arama konusu/nişi belirtti AMA mesajında veya önceki sohbet geçmişinde platform VE/VEYA takipçi aralığı henüz netleşmediyse (ve 'fark etmez / hepsi' denmediyse):
+     ARAMAYI HEMEN BAŞLATMA!
+     Kullanıcıya nazik, profesyonel bir dille konuyu anladığını belirt ve eksik kalan kriterleri sor:
+     * Hangi platformlara odaklanalım? (YouTube, Instagram, TikTok veya Hepsi)
+     * Belirli bir takipçi kitlesi (mikro 10k-50k, makro 100k+ vb.) arıyor musunuz yoksa fark etmez mi?
+     
+     Bu durumda JSON yanıtı:
+     {{
+       "action": "clarify",
+       "candidate_topic": "tespit_edilen_konu",
+       "reply_text": "Kullanıcıya gösterilecek kibar, maddeli soru metni"
+     }}
+
+3. TÜM KRİTERLER TAMAMSA VEYA KULLANICI SORULARA CEVAP VERDİYSE ('action': 'search'):
+   - Eğer kullanıcı ilk mesajında hem konuyu hem tercihleri belirttiyse (örn: 'youtube da 50k üzeri dizi eleştirmenleri'), VEYA önceki soruna istinaden filtre tercihlerini ilettiyse (örn: 'youtube ve tiktok olsun 50k üstü', 'hepsi olsun fark etmez' vb.):
+     Aksiyonu 'search' yap!
+     - 'keyword': Sosyal medya platformlarında (YouTube, Instagram, TikTok) arama yapmak için kullanılacak EN NET, EN KISA arama kelimesini veya tamlamasını çıkar (Örn: 'dizi film', 'seyahat', 'üniversite öğrencileri'). Kullanıcının konuşma dolgularını ('bana bul', 'homojen ağırlık ver', 'istiyorum' vb.) ASLA keyword içine koyma.
+     - 'platforms': Kullanıcının seçtiği platform listesi (örn: ["YouTube", "TikTok"]). 'Hepsi' veya 'fark etmez' dendiyse: ["YouTube", "TikTok", "Instagram"].
+     - 'min_followers': Varsa tam sayı (örn: 50000), yoksa null.
+     - 'max_followers': Varsa tam sayı (örn: 200000), yoksa null.
+     - 'reply_text': Kullanıcıya gösterilecek kibar Türkçe onay cümlesi.
+
+4. GENEL SOHBET VEYA SELAMLAŞMA ('action': 'chat'):
+   - Kullanıcı sadece 'merhaba', 'selam', 'nasılsın' dediyse ve aranacak bir konu yoksa:
+     Aksiyonu 'chat' yap. Nasıl yardımcı olabileceğini, hangi alanda influencer keşfetmek istediğini sor.
 
 YANIT FORMATI:
 Yalnızca geçerli bir JSON nesnesi döndür. Markdown kod bloğu olmadan saf JSON ver:
 {{
   "action": "search",
   "keyword": "kısa_arama_kelimesi",
-  "min_followers": {context.get('min_followers') or 0},
-  "max_followers": {context.get('max_followers') or 'null'},
-  "platforms": {json.dumps(context.get('platforms', ['YouTube', 'TikTok', 'Instagram']))},
-  "reply_text": "Kullanıcıya gösterilecek Türkçe onay mesajı"
+  "candidate_topic": "tespit_edilen_konu",
+  "min_followers": null,
+  "max_followers": null,
+  "platforms": ["YouTube", "TikTok", "Instagram"],
+  "reply_text": "Kullanıcıya gösterilecek Türkçe mesaj"
 }}
 """
         raw_text = self._call_gemini(prompt)
@@ -211,19 +221,12 @@ Yalnızca geçerli bir JSON nesnesi döndür. Markdown kod bloğu olmadan saf JS
             action = parsed.get("action", "search")
             
             if action == "search":
-                raw_kw = parsed.get("keyword") or ""
-                # Keyword temizliği
+                raw_kw = parsed.get("keyword") or parsed.get("candidate_topic") or ""
                 clean_kw = self._clean_keyword_string(raw_kw) or self._clean_keyword_string(user_message)
                 
                 min_f = parsed.get("min_followers")
-                if min_f is None:
-                    min_f = context.get("min_followers")
-                    
                 max_f = parsed.get("max_followers")
-                if max_f is None:
-                    max_f = context.get("max_followers")
-                    
-                plats = parsed.get("platforms") or context.get("platforms") or ["YouTube", "TikTok", "Instagram"]
+                plats = parsed.get("platforms") or ["YouTube", "TikTok", "Instagram"]
                 
                 reply = parsed.get("reply_text") or f"'{clean_kw}' konusu için içerik üreticileri aranıyor..."
                 
@@ -236,6 +239,12 @@ Yalnızca geçerli bir JSON nesnesi döndür. Markdown kod bloğu olmadan saf JS
                         "max_followers": max_f,
                         "platforms": plats
                     }
+                }
+            elif action == "clarify":
+                return {
+                    "text": parsed.get("reply_text") or "Hangi platformlarda ve hangi takipçi aralığında arama yapmamı istersiniz?",
+                    "action": None,
+                    "params": None
                 }
             else:
                 return {
@@ -259,53 +268,102 @@ Yalnızca geçerli bir JSON nesnesi döndür. Markdown kod bloğu olmadan saf JS
         greetings = ["merhaba", "selam", "günaydın", "iyi günler", "nasılsın", "kimsin", "ne yapabilirsin"]
         if any(lower_msg == g or lower_msg == f"{g}!" for g in greetings):
             return {
-                "text": "Merhaba! Sol paneldeki filtrelerinize uygun olarak hangi kategoride (örneğin üniversite öğrencileri, teknoloji, fitness) içerik üreticisi aramak istersiniz?",
+                "text": "Merhaba! Hangi kategoride veya nişte (örneğin teknoloji, seyahat, dizi/film, fitness vb.) içerik üreticisi keşfetmek istersiniz?",
                 "action": None,
                 "params": None
             }
 
-        # Takipçi aralığı regex tespiti
-        min_followers = context.get("min_followers")
-        max_followers = context.get("max_followers")
-        
-        # '1000-15000 arası' veya '10k ile 100k arası'
+        # Platform tespiti
+        platforms = []
+        has_platform = False
+        if "youtube" in lower_msg:
+            platforms.append("YouTube")
+            has_platform = True
+        if "tiktok" in lower_msg:
+            platforms.append("TikTok")
+            has_platform = True
+        if "instagram" in lower_msg:
+            platforms.append("Instagram")
+            has_platform = True
+        if any(w in lower_msg for w in ["hepsi", "tümü", "tüm platformlar", "fark etmez", "farketmez"]):
+            platforms = ["YouTube", "TikTok", "Instagram"]
+            has_platform = True
+        if not platforms:
+            platforms = ["YouTube", "TikTok", "Instagram"]
+
+        # Takipçi aralığı tespiti
+        min_followers = None
+        max_followers = None
+        has_followers = False
+
+        if "mikro" in lower_msg:
+            min_followers = 5000
+            max_followers = 50000
+            has_followers = True
+        elif "makro" in lower_msg:
+            min_followers = 100000
+            has_followers = True
+        elif "nano" in lower_msg:
+            min_followers = 1000
+            max_followers = 10000
+            has_followers = True
+        elif any(w in lower_msg for w in ["fark etmez", "farketmez", "sınır yok", "sınırsız", "hepsi"]):
+            has_followers = True
+
         range_match = re.search(r'(\d+[\.,]?\d*[km]?)\s*(?:ile|-)\s*(\d+[\.,]?\d*[km]?)\s*arası', lower_msg)
         if range_match:
             min_followers = _parse_num_text(range_match.group(1))
             max_followers = _parse_num_text(range_match.group(2))
+            has_followers = True
         else:
             min_match = re.search(r'(?:en az|minimum|min)\s*(\d+[\.,]?\d*[km]?)|(\d+[\.,]?\d*[km]?)\s*(?:üzeri|üstü|\+)', lower_msg)
             if min_match:
                 min_followers = _parse_num_text(min_match.group(1) or min_match.group(2))
+                has_followers = True
                 
             max_match = re.search(r'(?:en fazla|en çok|maksimum|maks|max)\s*(\d+[\.,]?\d*[km]?)|(\d+[\.,]?\d*[km]?)\s*(?:altı|kadar)', lower_msg)
             if max_match:
                 max_followers = _parse_num_text(max_match.group(1) or max_match.group(2))
+                has_followers = True
 
-        # Platform tespiti
-        platforms = list(context.get("platforms") or ["YouTube", "TikTok", "Instagram"])
-        mentioned_plats = []
-        if "youtube" in lower_msg:
-            mentioned_plats.append("YouTube")
-        if "tiktok" in lower_msg:
-            mentioned_plats.append("TikTok")
-        if "instagram" in lower_msg:
-            mentioned_plats.append("Instagram")
-        if mentioned_plats:
-            platforms = mentioned_plats
+        # Sohbet geçmişinde daha önce filtre sorusu sorulmuş mu?
+        asked_clarification = False
+        prev_topic = None
+        if history:
+            for m in reversed(history):
+                if m.get("role") == "assistant" and any(k in m.get("content", "") for k in ["Hangi platformlara odaklanalım", "tercihlerinizi netleştirelim", "Platform:", "Takipçi Kitlesi"]):
+                    asked_clarification = True
+                    break
+            if asked_clarification:
+                for m in reversed(history):
+                    if m.get("role") == "user":
+                        cand = self._clean_keyword_string(m.get("content", ""))
+                        if cand and len(cand) >= 3 and not any(p.lower() in cand.lower() for p in ["youtube", "tiktok", "instagram"]):
+                            prev_topic = cand
+                            break
 
         # Arama kelimesini ayıkla
         clean_keyword = self._clean_keyword_string(user_message)
-        
-        # Eğer temizlenmiş kelime boş kaldıysa ama önceki geçmişte konu varsa
-        if not clean_keyword and history:
-            for m in reversed(history):
-                if m.get("role") == "user":
-                    candidate = self._clean_keyword_string(m.get("content", ""))
-                    if candidate:
-                        clean_keyword = candidate
-                        break
-                        
+
+        # Eğer kullanıcı daha önce sorulan filtre sorusuna yanıt veriyorsa:
+        if asked_clarification and prev_topic:
+            clean_keyword = prev_topic
+        elif not has_platform and not has_followers:
+            # Kullanıcı konu belirtti ama filtre belirtmedi -> Filtreleri sor!
+            if clean_keyword and len(clean_keyword) >= 2:
+                clarify_text = (
+                    f"**'{clean_keyword.title()}'** konusunda içerik üreticilerini araştırmaya başlayabilirim! 🎬\n\n"
+                    f"Aramayı başlatmadan önce tercihlerinizi netleştirelim:\n"
+                    f"1. **Platform:** Hangi platformlara odaklanalım? (YouTube, Instagram, TikTok veya Hepsi)\n"
+                    f"2. **Takipçi Kitlesi / Ölçek:** Belirli bir takipçi kitlesi arıyor musunuz? (Örn: Mikro 10k-50k, Makro 100k+ veya Fark etmez / Sınırsız)\n\n"
+                    f"Tercihlerinizi belirttiğinizde hemen araştırmayı başlatacağım!"
+                )
+                return {
+                    "text": clarify_text,
+                    "action": None,
+                    "params": None
+                }
+
         if not clean_keyword:
             clean_keyword = user_message.strip()
 
@@ -358,16 +416,28 @@ Yalnızca geçerli bir JSON nesnesi döndür. Markdown kod bloğu olmadan saf JS
             r'tüm\s+platformlar(?:da|dan)?',
             r'hedef\s+kitlem',
             r'hedef\s+kitle',
+            r'içerik\s+üreten\s+kişiler',
+            r'içerik\s+üretenler',
+            r'içerik\s+üreten',
+            r'içerik\s+üreticilerini',
+            r'içerik\s+üreticileri',
+            r'içerik\s+üreticisi',
             r'kişileri\s+arıyorum',
             r'kişileri\s+bul',
             r'kişileri',
+            r'kişiler\s+lazım',
+            r'kişiler',
             r'insanları\s+arıyorum',
-            r'içerik\s+üreticilerini',
-            r'içerik\s+üreticileri',
             r'influencerları',
             r'influencerlarını',
+            r'influencerlar',
+            r'influencer',
             r'hesapları',
+            r'hesaplar',
             r'kanalları',
+            r'kanallar',
+            r'lazım',
+            r'gerekiyor',
             r'bana\s+bul',
             r'bana\s+getir',
             r'bana\s+öner',
@@ -387,7 +457,8 @@ Yalnızca geçerli bir JSON nesnesi döndür. Markdown kod bloğu olmadan saf JS
             r'olan',
             r'için',
             r'hakkında',
-            r'üzerine'
+            r'üzerine',
+            r'konusunda'
         ]
         for np in noise_phrases:
             s = re.sub(rf'\b{np}\b', ' ', s, flags=re.IGNORECASE)

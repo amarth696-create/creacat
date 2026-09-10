@@ -96,71 +96,6 @@ def render_sidebar() -> Dict[str, Any]:
 
     st.sidebar.markdown("---")
     
-    # 4. ARAMA AYARLARI
-    with st.sidebar.expander("⚙️ Arama & Platform Filtreleri", expanded=True):
-        platforms = st.multiselect(
-            "Platformlar",
-            options=["YouTube", "TikTok", "Instagram"],
-            default=["YouTube", "TikTok", "Instagram"],
-            help="Arama yapılacak platformları seçin."
-        )
-        
-        depth = 3
-        st.caption("⚡ **Analiz Seviyesi:** Maksimum (Derin AI Analizi)")
-        
-        min_followers = st.number_input(
-            "Minimum Takipçi",
-            min_value=0,
-            value=1000,
-            step=1000,
-            help="Minimum takipçi sayısını belirleyin."
-        )
-        
-        max_followers = st.number_input(
-            "Maksimum Takipçi (0 = Sınırsız)",
-            min_value=0,
-            value=0,
-            step=10000,
-            help="Maksimum takipçi sınırı. 0 bırakılırsa üst sınır uygulanmaz."
-        )
-        
-        country = st.selectbox(
-            "Ülke",
-            options=["Hepsi", "Türkiye", "ABD", "Almanya", "İngiltere", "Fransa"],
-            index=0
-        )
-        
-        language = st.selectbox(
-            "Dil",
-            options=["Hepsi", "Türkçe", "İngilizce", "Almanca"],
-            index=0
-        )
-
-        st.markdown("---")
-        st.subheader("📊 Sıralama & İşbirliği")
-        sort_by = st.selectbox(
-            "Sonuçları Sırala",
-            options=[
-                "AI Uygunluk Skoru (Varsayılan)",
-                "Yatay Video Ortalama İzlenmesi",
-                "Shorts Ortalama İzlenmesi",
-                "Takipçi Sayısı"
-            ],
-            index=0,
-            help="İçerik üreticilerini seçtiğiniz performans metriğine göre sıralar."
-        )
-
-        sponsor_filter = st.selectbox(
-            "İşbirliği / Reklam Filtresi",
-            options=[
-                "Tümü (Filtresiz)",
-                "Yalnızca İşbirliği Yapmış Hesaplar",
-                "Yalnızca Organik (İşbirliksiz)"
-            ],
-            index=0,
-            help="Önceden ticari işbirliği/reklam yapmış hesapları ayıklar."
-        )
-
     st.sidebar.markdown("---")
     st.sidebar.subheader("🔑 API Durumu")
     import os
@@ -187,12 +122,12 @@ def render_sidebar() -> Dict[str, Any]:
             st.rerun()
     
     return {
-        "platforms": platforms,
-        "depth": depth,
-        "min_followers": min_followers,
-        "max_followers": max_followers if max_followers > 0 else None,
-        "country": country if country != "Hepsi" else None,
-        "language": language if language != "Hepsi" else None,
-        "sort_by": sort_by,
-        "sponsor_filter": sponsor_filter
+        "platforms": ["YouTube", "TikTok", "Instagram"],
+        "depth": 3,
+        "min_followers": None,
+        "max_followers": None,
+        "country": None,
+        "language": None,
+        "sort_by": "AI Uygunluk Skoru (Varsayılan)",
+        "sponsor_filter": "Tümü (Filtresiz)"
     }
