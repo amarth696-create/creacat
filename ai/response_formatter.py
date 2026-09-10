@@ -15,6 +15,7 @@ def format_search_results(creators: List[Any], keyword: str, hashtags: List[str]
         
     lines = [
         f"### 🎯 '{keyword.capitalize()}' Konusunda İçerikleri Doğrulanan En Uygun Üreticiler ({len(creators)} Kişi):",
+        f"👉 **<Listen burada: [Tam Ekran Liste Görünümünü Aç](?view=list)>**",
         header_extra
     ]
     

@@ -29,6 +29,7 @@ from processors.expander import KeywordExpander
 from auth.auth_manager import AuthManager
 from auth.login_ui import render_login_screen
 from ai.chat_storage import ChatStorage
+from ui.list_view import render_standalone_list_page
 
 st.set_page_config(
     page_title="İçerik Üretici Keşif Sistemi",
@@ -258,22 +259,52 @@ def main():
         st.session_state["active_chat_id"] = active_chat_id
         st.session_state["chat_history"] = ChatStorage.get_messages(active_chat_id)
 
+    # 4. GÖRÜNÜM MODU KONTROLÜ (SOHBET VS. BAĞIMSIZ LİSTE SAYFASI)
+    url_view = st.query_params.get("view")
+    if url_view == "list" or st.session_state.get("view_mode") == "list":
+        # Son arama sonuçlarını bul (önce session_state'ten, yoksa aktif sohbetin son sonuçlu mesajından)
+        active_results = st.session_state.get("last_search_results")
+        active_kw = st.session_state.get("last_search_keyword", "")
+        
+        if not active_results:
+            msgs = st.session_state.get("chat_history") or []
+            for m in reversed(msgs):
+                if m.get("results"):
+                    active_results = m["results"]
+                    break
+                    
+        render_standalone_list_page(
+            creators=active_results or [],
+            keyword=active_kw,
+            settings=settings,
+            conv_id=active_chat_id
+        )
+        return
+
     st.title("🗣️ İçerik Üretici Keşif Asistanı")
     st.caption("TikTok, Instagram ve YouTube üzerinde konulara göre içerik üreticilerini bulun ve analiz edin.")
     
     bot = ChatBot(Config.GEMINI_API_KEY)
     conv = ConversationManager()
     
-    # 4. AKTİF SOHBETİN MESAJLARINI GÖSTER
+    # 5. AKTİF SOHBETİN MESAJLARINI GÖSTER
     chat_history = get_state("chat_history") or []
-    for msg in chat_history:
+    for m_idx, msg in enumerate(chat_history):
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
             if "results" in msg and msg["results"]:
-                render_summary_metrics(msg["results"])
-                render_results_table(msg["results"], settings["depth"])
-                render_download_buttons(msg["results"], "arama")
-                for c in msg["results"]:
+                res_list = msg["results"]
+                col_view1, col_view2 = st.columns([1, 3])
+                with col_view1:
+                    if st.button("📋 Listeyi Tam Sayfada Aç", key=f"btn_view_page_{m_idx}", type="primary"):
+                        st.session_state["last_search_results"] = res_list
+                        st.session_state["view_mode"] = "list"
+                        st.query_params["view"] = "list"
+                        st.rerun()
+                render_summary_metrics(res_list)
+                render_results_table(res_list, settings["depth"])
+                render_download_buttons(res_list, "arama")
+                for c in res_list:
                     render_creator_card(c)
             
     # 5. KULLANICI GİRDİSİ VE CEVAP ÜRETİMİ
@@ -314,8 +345,18 @@ def main():
                 
                 kw = response["params"].get("keyword", prompt)
                 if results:
+                    st.session_state["last_search_results"] = results
+                    st.session_state["last_search_keyword"] = kw
                     list_text = format_search_results(results, kw, hashtags=hashtags, related_keywords=related_keywords)
                     st.markdown(list_text)
+                    
+                    col_v1, col_v2 = st.columns([1, 3])
+                    with col_v1:
+                        if st.button("📋 Listeyi Tam Sayfada Aç", key="btn_view_page_live", type="primary"):
+                            st.session_state["view_mode"] = "list"
+                            st.query_params["view"] = "list"
+                            st.rerun()
+                            
                     render_summary_metrics(results)
                     render_results_table(results, settings["depth"])
                     render_download_buttons(results, kw)

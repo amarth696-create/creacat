@@ -21,6 +21,8 @@ def render_sidebar() -> Dict[str, Any]:
             new_id = ChatStorage.create_conversation(current_user["email"], title="Yeni Sohbet")
             st.session_state["active_chat_id"] = new_id
             st.session_state["chat_history"] = []
+            st.session_state["view_mode"] = "chat"
+            st.query_params.clear()
             st.rerun()
 
     # 3. SOHBET GEÇMİŞİ LİSTESİ (GEMINI / CHATGPT TARZI)
@@ -48,6 +50,8 @@ def render_sidebar() -> Dict[str, Any]:
                     if st.button(display_label, key=f"conv_{c_id}", use_container_width=True):
                         st.session_state["active_chat_id"] = c_id
                         st.session_state["chat_history"] = ChatStorage.get_messages(c_id)
+                        st.session_state["view_mode"] = "chat"
+                        st.query_params.clear()
                         st.rerun()
                 with col_del:
                     if st.button("🗑️", key=f"del_{c_id}", help="Bu sohbeti sil"):
