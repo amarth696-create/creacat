@@ -64,6 +64,37 @@ def render_sidebar() -> Dict[str, Any]:
             st.sidebar.caption("Henüz kayıtlı bir sohbetiniz yok.")
             
     st.sidebar.markdown("---")
+
+    # 4. KAYITLI LİSTELERİM (SAVED LISTS)
+    st.sidebar.subheader("📂 Kayıtlı Listelerim")
+    if current_user:
+        user_lists = ChatStorage.get_user_lists(current_user["email"])
+        if user_lists:
+            for l_item in user_lists[:10]:
+                lid = l_item["id"]
+                ltitle = l_item["title"]
+                lcnt = l_item["item_count"]
+                
+                col_lbtn, col_ldel = st.sidebar.columns([5, 1])
+                with col_lbtn:
+                    if st.button(f"📋 {ltitle} ({lcnt})", key=f"list_nav_{lid}", use_container_width=True):
+                        full_list = ChatStorage.get_list_by_id(lid)
+                        if full_list:
+                            st.session_state["last_search_results"] = full_list["creators"]
+                            st.session_state["last_search_keyword"] = full_list["keyword"]
+                            st.session_state["current_list_title"] = full_list["title"]
+                            st.session_state["current_list_id"] = full_list["id"]
+                            st.session_state["view_mode"] = "list"
+                            st.query_params["view"] = "list"
+                            st.rerun()
+                with col_ldel:
+                    if st.button("🗑️", key=f"del_list_{lid}", help="Bu listeyi sil"):
+                        ChatStorage.delete_list(lid)
+                        st.rerun()
+        else:
+            st.sidebar.caption("Henüz kayıtlı bir listeniz yok.")
+
+    st.sidebar.markdown("---")
     
     # 4. ARAMA AYARLARI
     with st.sidebar.expander("⚙️ Arama & Platform Filtreleri", expanded=True):

@@ -46,6 +46,17 @@ class ChatStorage:
                 FOREIGN KEY (conversation_id) REFERENCES chat_conversations(id) ON DELETE CASCADE
             )
         """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS saved_lists (
+                id TEXT PRIMARY KEY,
+                user_email TEXT NOT NULL,
+                title TEXT NOT NULL,
+                keyword TEXT NOT NULL,
+                item_count INTEGER NOT NULL,
+                results_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
         conn.commit()
 
     @classmethod
@@ -179,3 +190,100 @@ class ChatStorage:
         cursor.execute("DELETE FROM chat_conversations WHERE id = ?", (conversation_id,))
         conn.commit()
         conn.close()
+
+    # --- KAYITLI LİSTELER (SAVED LISTS) YÖNETİMİ ---
+
+    @classmethod
+    def save_list(cls, user_email: str, title: str, keyword: str, creators: List[Any]) -> str:
+        """Kullanıcının oluşturduğu bir listeyi kalıcı olarak kaydeder ve list_id döner."""
+        conn = cls.get_db_connection()
+        cursor = conn.cursor()
+        list_id = str(uuid.uuid4())
+        now_str = datetime.now().isoformat()
+        
+        serializable = []
+        for c in creators:
+            if hasattr(c, "to_dict"):
+                serializable.append(c.to_dict())
+            elif isinstance(c, dict):
+                serializable.append(c)
+                
+        results_json = json.dumps(serializable, ensure_ascii=False)
+        
+        cursor.execute("""
+            INSERT INTO saved_lists (id, user_email, title, keyword, item_count, results_json, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (list_id, user_email.strip().lower(), title.strip(), keyword.strip(), len(creators), results_json, now_str))
+        
+        conn.commit()
+        conn.close()
+        return list_id
+
+    @classmethod
+    def get_user_lists(cls, user_email: str) -> List[Dict[str, Any]]:
+        """Kullanıcının kaydettiği tüm listeleri getirir."""
+        conn = cls.get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, title, keyword, item_count, created_at
+            FROM saved_lists
+            WHERE user_email = ?
+            ORDER BY created_at DESC
+        """, (user_email.strip().lower(),))
+        
+        rows = cursor.fetchall()
+        conn.close()
+        
+        return [
+            {
+                "id": r[0],
+                "title": r[1],
+                "keyword": r[2],
+                "item_count": r[3],
+                "created_at": r[4]
+            }
+            for r in rows
+        ]
+
+    @classmethod
+    def get_list_by_id(cls, list_id: str) -> Optional[Dict[str, Any]]:
+        """ID'ye göre kayıtlı bir listeyi ve içindeki Creator nesnelerini döner."""
+        conn = cls.get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, user_email, title, keyword, item_count, results_json, created_at
+            FROM saved_lists
+            WHERE id = ?
+        """, (list_id,))
+        
+        row = cursor.fetchone()
+        conn.close()
+        
+        if not row:
+            return None
+            
+        try:
+            raw_list = json.loads(row[5])
+            creators = [Creator.from_dict(c) for c in raw_list]
+        except Exception:
+            creators = []
+            
+        return {
+            "id": row[0],
+            "user_email": row[1],
+            "title": row[2],
+            "keyword": row[3],
+            "item_count": row[4],
+            "creators": creators,
+            "created_at": row[6]
+        }
+
+    @classmethod
+    def delete_list(cls, list_id: str) -> None:
+        """Kayıtlı bir listeyi siler."""
+        conn = cls.get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM saved_lists WHERE id = ?", (list_id,))
+        conn.commit()
+        conn.close()
+

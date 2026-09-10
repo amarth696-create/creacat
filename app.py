@@ -294,20 +294,24 @@ def main():
             st.markdown(msg["content"])
             if "results" in msg and msg["results"]:
                 res_list = msg["results"]
-                col_view1, col_view2 = st.columns([1, 3])
-                with col_view1:
-                    if st.button("📋 Listeyi Tam Sayfada Aç", key=f"btn_view_page_{m_idx}", type="primary"):
-                        st.session_state["last_search_results"] = res_list
-                        st.session_state["view_mode"] = "list"
-                        st.query_params["view"] = "list"
-                        st.rerun()
-                render_summary_metrics(res_list)
-                render_results_table(res_list, settings["depth"])
-                render_download_buttons(res_list, "arama")
-                for c in res_list:
-                    render_creator_card(c)
+                res_kw = msg.get("keyword", "")
+                c_cnt = len(res_list)
+                
+                # Chat akışını boğmamak için temiz yönlendirme kartı
+                with st.container():
+                    col_info, col_btn = st.columns([3, 1.5])
+                    with col_info:
+                        st.markdown(f"📊 **{c_cnt} İçerik Üreticisi Bulundu** — Detaylı analizler, filtreler ve indirme seçenekleri liste sayfasında.")
+                    with col_btn:
+                        if st.button("📋 Listeyi Görüntüle", key=f"btn_view_page_{m_idx}", type="primary", use_container_width=True):
+                            st.session_state["last_search_results"] = res_list
+                            st.session_state["last_search_keyword"] = res_kw
+                            st.session_state["current_list_title"] = f"'{res_kw.title()}' Arama Listesi" if res_kw else "İçerik Üreticileri"
+                            st.session_state["view_mode"] = "list"
+                            st.query_params["view"] = "list"
+                            st.rerun()
             
-    # 5. KULLANICI GİRDİSİ VE CEVAP ÜRETİMİ
+    # 6. KULLANICI GİRDİSİ VE CEVAP ÜRETİMİ
     prompt = st.chat_input("Hangi konuda influencer arıyorsunuz?")
     if prompt:
         with st.chat_message("user"):
@@ -347,22 +351,34 @@ def main():
                 if results:
                     st.session_state["last_search_results"] = results
                     st.session_state["last_search_keyword"] = kw
-                    list_text = format_search_results(results, kw, hashtags=hashtags, related_keywords=related_keywords)
-                    st.markdown(list_text)
+                    st.session_state["current_list_title"] = f"'{kw.title()}' Arama Listesi"
                     
-                    col_v1, col_v2 = st.columns([1, 3])
-                    with col_v1:
-                        if st.button("📋 Listeyi Tam Sayfada Aç", key="btn_view_page_live", type="primary"):
+                    # Kullanıcı adına listeyi kalıcı veritabanına otomatik kaydet
+                    if current_user:
+                        try:
+                            ChatStorage.save_list(current_user["email"], f"{kw.title()} Listesi", kw, results)
+                        except Exception:
+                            pass
+
+                    clean_summary = (
+                        f"🎯 **'{kw.title()}'** konusu için kriterlere uygun **{len(results)} içerik üreticisi** bulundu ve performansları analiz edildi.\n\n"
+                        f"👉 **<Listen burada: [Tam Ekran Liste Sayfasını Aç](?view=list)>**\n\n"
+                        f"*Detaylı metrik tablosu, etkileşim/izlenme oranları ve Excel indirme seçenekleri liste sayfasında sunulmaktadır.*"
+                    )
+                    st.markdown(clean_summary)
+                    
+                    col_view_now, _ = st.columns([1.5, 3])
+                    with col_view_now:
+                        if st.button("📋 Listeyi Tam Sayfada Aç", key="btn_view_page_live", type="primary", use_container_width=True):
                             st.session_state["view_mode"] = "list"
                             st.query_params["view"] = "list"
                             st.rerun()
-                            
-                    render_summary_metrics(results)
-                    render_results_table(results, settings["depth"])
-                    render_download_buttons(results, kw)
-                    for c in results:
-                        render_creator_card(c)
-                    saved_content = list_text
+                    
+                    # Otomatik yönlendirme: Listeye doğrudan geçiş yap
+                    st.session_state["view_mode"] = "list"
+                    st.query_params["view"] = "list"
+                    
+                    saved_content = clean_summary
                 else:
                     empty_text = f"🔍 **'{kw}'** konusu için kriterlere uygun içerik üreticisi bulunamadı. Filtreleri genişleterek tekrar deneyebilirsiniz."
                     st.warning(empty_text)
@@ -375,6 +391,7 @@ def main():
             assistant_msg = {"role": "assistant", "content": saved_content}
             if results:
                 assistant_msg["results"] = results
+                assistant_msg["keyword"] = kw
             
             history = get_state("chat_history")
             history.append(assistant_msg)
@@ -382,6 +399,9 @@ def main():
             
             if active_chat_id:
                 ChatStorage.add_message(active_chat_id, "assistant", saved_content, results=results)
+
+            if results:
+                st.rerun()
 
 if __name__ == "__main__":
     main()

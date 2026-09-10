@@ -161,6 +161,10 @@ def render_download_buttons(creators: List[Any], keyword: str) -> None:
         ca = getattr(c, "content_analysis", None)
         has_sp = getattr(c, "has_sponsored_content", False)
         sp_cnt = getattr(c, "sponsored_video_count", 0)
+        sp_kws = getattr(c, "sponsor_keywords_found", [])
+        recent = getattr(c, "recent_contents", []) or (getattr(ca, "ana_konular", []) if ca else [])
+        tags = getattr(ca, "konu_etiketleri", []) if ca else []
+        
         records.append({
             "Kullanıcı Adı": getattr(c, "username", ""),
             "Platform": get_platform_name(c),
@@ -171,37 +175,53 @@ def render_download_buttons(creators: List[Any], keyword: str) -> None:
             "Shorts Ort. İzlenme": getattr(c, "avg_shorts_views", 0) or 0,
             "İşbirliği / Reklam Var mı": "Evet" if has_sp else "Hayır",
             "Tespit Edilen İşbirliği Sayısı": sp_cnt,
+            "İşbirliği Anahtar Kelimeleri": ", ".join(sp_kws) if sp_kws else "-",
             "Etkileşim Oranı (%)": getattr(c, "engagement_rate", 0.0) or 0.0,
-            "Skor": getattr(c, "final_score", 0.0) or getattr(c, "score", 0.0) or 0.0,
-            "Bio": getattr(c, "bio", ""),
+            "Uygunluk Skoru": getattr(c, "final_score", 0.0) or getattr(c, "score", 0.0) or 0.0,
+            "Niş / Odak Alanı": getattr(ca, "nis_alani", "-") if ca else "-",
+            "Hedef Kitle": getattr(ca, "hedef_kitle", "-") if ca else "-",
+            "Konu Etiketleri": ", ".join(tags) if tags else "-",
+            "İncelenen Son İçerikler": " | ".join(recent[:3]) if recent else "-",
             "Profil URL": getattr(c, "profile_url", ""),
-            "AI Özeti": getattr(ca, "llm_ozet", "") if ca else ""
+            "AI İnceleme & Analiz Özeti": getattr(ca, "llm_ozet", "") if ca else "",
+            "Bio / Hakkında": getattr(c, "bio", "")
         })
         
     df = pd.DataFrame(records)
     
     excel_buffer = io.BytesIO()
     with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name="Tüm Sonuçlar")
+        df.to_excel(writer, index=False, sheet_name="Influencer Listesi")
     excel_data = excel_buffer.getvalue()
     
+    csv_data = df.to_csv(index=False, encoding='utf-8-sig').encode('utf-8-sig')
     json_data = json.dumps([c.to_dict() if hasattr(c, "to_dict") else dict(c) for c in creators], indent=2, ensure_ascii=False)
 
     safe_kw = keyword.replace(" ", "_").lower()
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
         st.download_button(
             label="📗 Excel Raporu İndir (.xlsx)",
             data=excel_data,
             file_name=f"influencer_{safe_kw}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
         )
     with col2:
+        st.download_button(
+            label="📊 CSV Olarak İndir (.csv)",
+            data=csv_data,
+            file_name=f"influencer_{safe_kw}.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+    with col3:
         st.download_button(
             label="📁 JSON Formatında İndir",
             data=json_data.encode('utf-8'),
             file_name=f"influencer_{safe_kw}.json",
-            mime="application/json"
+            mime="application/json",
+            use_container_width=True
         )
 
 def render_comparison_table(creators: List[Any]) -> None:

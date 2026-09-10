@@ -7,6 +7,8 @@ from ui.components import (
     render_creator_card,
     get_platform_name
 )
+from ai.chat_storage import ChatStorage
+from auth.auth_manager import AuthManager
 
 def render_standalone_list_page(
     creators: List[Any], 
@@ -16,23 +18,40 @@ def render_standalone_list_page(
 ) -> None:
     """
     Sohbet akışından bağımsız, odaklanmış ve temiz tam sayfa liste görünümü.
-    Kullanıcı arama yaptığında doğrudan bu sayfaya yönlendirilebilir veya butona basarak açabilir.
+    Kullanıcı arama yaptığında doğrudan bu sayfaya yönlendirilir.
+    Listeler kalıcı olarak kaydedilebilir, filtrelenebilir ve Excel/JSON olarak dışa aktarılabilir.
     """
     settings = settings or {}
+    current_user = AuthManager.get_current_user()
     
-    # Üst Navigasyon Çubuğu (Geri Dön ve Başlık)
-    nav_col1, nav_col2 = st.columns([1, 4])
+    # 1. ÜST NAVİGASYON ÇUBUĞU (Geri Dön, Başlık ve Listeyi Kaydet)
+    nav_col1, nav_col2, nav_col3 = st.columns([1.5, 3.5, 1.5])
     with nav_col1:
-        if st.button("⬅️ Sohbete Geri Dön", key="btn_back_to_chat", use_container_width=True, type="primary"):
+        if st.button("⬅️ Sohbete Geri Dön", key="btn_back_to_chat", use_container_width=True, type="secondary"):
             st.session_state["view_mode"] = "chat"
             st.query_params.clear()
             st.rerun()
             
     with nav_col2:
-        title_str = keyword.title() if keyword else "İçerik Üreticileri"
-        st.markdown(f"### 📋 **{title_str}** — Arama Sonuç Listesi")
+        title_str = st.session_state.get("current_list_title") or (f"'{keyword.title()}' Arama Listesi" if keyword else "İçerik Üreticileri")
+        st.markdown(f"### 📋 **{title_str}**")
 
-    st.caption("Aşağıda yapılan arama neticesinde doğrulanmış, filtrelenmiş ve performansları analiz edilmiş içerik üreticileri listelenmektedir.")
+    with nav_col3:
+        # Listeyi kalıcı olarak kaydetme butonu / durumu
+        if creators and current_user:
+            list_save_key = f"saved_{keyword}_{len(creators)}"
+            is_saved = st.session_state.get(list_save_key, False)
+            if not is_saved:
+                if st.button("💾 Bu Listeyi Kaydet", key="btn_save_current_list", use_container_width=True, type="primary"):
+                    new_title = keyword.title() if keyword else "Özel Liste"
+                    ChatStorage.save_list(current_user["email"], new_title, keyword, creators)
+                    st.session_state[list_save_key] = True
+                    st.toast("✅ Liste başarıyla 'Kayıtlı Listelerim'e kaydedildi!", icon="💾")
+                    st.rerun()
+            else:
+                st.button("✅ Kaydedildi", key="btn_already_saved", use_container_width=True, disabled=True)
+
+    st.caption("Bu sayfada arama neticesinde tespit edilen, filtrelenmiş ve performansları doğrulanmış içerik üreticileri detaylı olarak listelenmektedir.")
     st.markdown("---")
 
     if not creators:
@@ -43,17 +62,18 @@ def render_standalone_list_page(
             st.rerun()
         return
 
-    # 1. ÖZET METRİKLER (KPI KARTLARI)
+    # 2. ÖZET METRİKLER (KPI KARTLARI)
     render_summary_metrics(creators)
     
-    # 2. HIZLI FİLTRELEME & ARAMA ÇUBUĞU (LİSTE İÇİNDE ANLIK ARAMA)
+    # 3. HIZLI FİLTRELEME & ARAMA ÇUBUĞU (LİSTE İÇİNDE ANLIK ARAMA)
     f_col1, f_col2, f_col3 = st.columns([2, 1, 1])
     with f_col1:
-        search_filter = st.text_input("🔎 Liste İçinde Filtrele (Kullanıcı Adı veya Niş)", "", placeholder="Örn: barisözcan, teknoloji, gezi...")
+        search_filter = st.text_input("🔎 Liste İçinde Filtrele (Kullanıcı Adı, Bio veya Niş)", "", placeholder="Örn: teknoloji, barisozcan, gezi...")
     with f_col2:
+        platforms_present = ["Tümü"] + sorted(list(set(get_platform_name(c) for c in creators)))
         platform_filter = st.selectbox(
             "Platform", 
-            ["Tümü"] + sorted(list(set(get_platform_name(c) for c in creators))),
+            platforms_present,
             key="list_view_plat_filter"
         )
     with f_col3:
@@ -83,19 +103,18 @@ def render_standalone_list_page(
     elif sponsor_filter == "Yalnızca Organikler":
         filtered_creators = [c for c in filtered_creators if not getattr(c, "has_sponsored_content", False)]
 
-    # 3. İNDİRME BUTONLARI (EXCEL & JSON)
+    # 4. İNDİRME BUTONLARI (EXCEL & JSON FORMATINDA TAM DIŞA AKTARIM)
     st.markdown("##### 📥 Listeyi Dışa Aktar")
     render_download_buttons(filtered_creators, keyword or "influencer_listesi")
 
-    # 4. İNTERAKTİF TABLO
+    # 5. DETAYLI İNTERAKTİF TABLO
     st.markdown(f"##### 📊 Detaylı Tablo ({len(filtered_creators)} / {len(creators)} Üretici)")
     render_results_table(filtered_creators, depth=settings.get("depth", 3))
 
-    # 5. PROFİL KARTLARI (EXPANDER FORMATINDA İNCELEME)
+    # 6. PROFİL KARTLARI (EXPANDER FORMATINDA İNCELEME)
     st.markdown("---")
     st.markdown("##### 🔍 Profil Detayları & İçerik Analizleri")
     
-    # 2 sütunlu kart ızgarası
     col_left, col_right = st.columns(2)
     for idx, c in enumerate(filtered_creators):
         target_col = col_left if idx % 2 == 0 else col_right
@@ -104,7 +123,7 @@ def render_standalone_list_page(
 
     # Alt Kısım Sohbete Geri Dön Butonu
     st.markdown("---")
-    bottom_c1, bottom_c2 = st.columns([1, 3])
+    bottom_c1, bottom_c2 = st.columns([1.5, 3])
     with bottom_c1:
         if st.button("⬅️ Sohbete Geri Dön", key="btn_back_to_chat_bottom", use_container_width=True):
             st.session_state["view_mode"] = "chat"
