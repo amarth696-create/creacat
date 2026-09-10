@@ -49,7 +49,23 @@ def format_search_results(creators: List[Any], keyword: str, hashtags: List[str]
         
         link = f"[{username}]({url})" if url != "#" else f"**@{username}**"
         lines.append(f"{i}. 👤 **{link}** — **{badge}** — {act_badge}")
-        lines.append(f"   • 👥 **Takipçi:** {followers:,} | 📈 **Etkileşim:** %{eng:.2f} | ⭐ **Uygunluk Skoru:** {score:.1f}/100 | 🟢 **Herkese Açık**")
+        
+        v_views = getattr(c, "avg_video_views", 0) or 0
+        s_views = getattr(c, "avg_shorts_views", 0) or 0
+        v_str = f"📺 **Yatay İzlenme:** {v_views:,}" if v_views > 0 else ""
+        s_str = f"📱 **Shorts:** {s_views:,}" if s_views > 0 else ""
+        views_part = f" | {v_str} | {s_str}" if (v_str or s_str) else ""
+        
+        lines.append(f"   • 👥 **Takipçi:** {followers:,} | 📈 **Etkileşim:** %{eng:.2f} | ⭐ **Uygunluk Skoru:** {score:.1f}/100{views_part}")
+        
+        has_sp = getattr(c, "has_sponsored_content", False)
+        sp_cnt = getattr(c, "sponsored_video_count", 0)
+        sp_kws = getattr(c, "sponsor_keywords_found", [])
+        if has_sp:
+            kw_text = f" ({', '.join(sp_kws[:3])})" if sp_kws else ""
+            lines.append(f"   • 🤝 **İşbirliği Geçmişi:** Ticari İşbirliği / Reklam Yapmış ({sp_cnt} video tespit edildi){kw_text}")
+        else:
+            lines.append("   • 🌿 **İşbirliği Durumu:** Organik İçerik Üreticisi (Ticari reklam tespit edilmedi)")
         
         if not is_active:
             warning_msg = inactivity_warn or f"Bu profil 2 aydan uzun süredir yeni içerik üretmemiştir ({last_post or 'uzun süredir inaktif'})."

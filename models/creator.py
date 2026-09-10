@@ -47,6 +47,11 @@ class Creator:
     avg_likes_per_post: float = 0.0
     avg_comments_per_post: float = 0.0
     avg_views_per_video: float = 0.0
+    avg_video_views: int = 0
+    avg_shorts_views: int = 0
+    has_sponsored_content: bool = False
+    sponsored_video_count: int = 0
+    sponsor_keywords_found: List[str] = field(default_factory=list)
     engagement_rate: float = 0.0
     content_analysis: Optional[ContentAnalysis] = None
     final_score: float = 0.0

@@ -195,9 +195,27 @@ def execute_search(params, settings):
         except Exception:
             analyzed.append(c)
             
-    # Puanlama & sıralama
+    # Puanlama
     scored = scorer.score(analyzed, keyword=keyword)
-    sorted_creators = sorted(scored, key=lambda c: getattr(c, "final_score", 0.0) or 0.0, reverse=True)
+    
+    # Sponsorluk / İşbirliği Filtresi
+    sponsor_pref = settings.get("sponsor_filter", "Tümü (Filtresiz)")
+    if sponsor_pref == "Yalnızca İşbirliği Yapmış Hesaplar":
+        scored = [c for c in scored if getattr(c, "has_sponsored_content", False)]
+    elif sponsor_pref == "Yalnızca Organik (İşbirliksiz)":
+        scored = [c for c in scored if not getattr(c, "has_sponsored_content", False)]
+
+    # Sıralama Kriteri (Skor, Yatay İzlenme, Shorts İzlenme, Takipçi)
+    sort_by = settings.get("sort_by", "AI Uygunluk Skoru (Varsayılan)")
+    if "Yatay Video Ortalama" in sort_by:
+        sorted_creators = sorted(scored, key=lambda c: getattr(c, "avg_video_views", 0) or 0, reverse=True)
+    elif "Shorts Ortalama" in sort_by:
+        sorted_creators = sorted(scored, key=lambda c: getattr(c, "avg_shorts_views", 0) or 0, reverse=True)
+    elif "Takipçi" in sort_by:
+        sorted_creators = sorted(scored, key=lambda c: getattr(c, "followers", 0) or 0, reverse=True)
+    else:
+        sorted_creators = sorted(scored, key=lambda c: getattr(c, "final_score", 0.0) or 0.0, reverse=True)
+
     # Seçilen platformlar arasında eşit ve homojen dağılım sağla (YouTube, Instagram, TikTok dengesi)
     final_creators = balance_by_platform(sorted_creators, raw_platforms, limit=Config.DEFAULT_LIMIT)
     

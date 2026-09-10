@@ -101,6 +101,31 @@ def render_sidebar() -> Dict[str, Any]:
             index=0
         )
 
+        st.markdown("---")
+        st.subheader("📊 Sıralama & İşbirliği")
+        sort_by = st.selectbox(
+            "Sonuçları Sırala",
+            options=[
+                "AI Uygunluk Skoru (Varsayılan)",
+                "Yatay Video Ortalama İzlenmesi",
+                "Shorts Ortalama İzlenmesi",
+                "Takipçi Sayısı"
+            ],
+            index=0,
+            help="İçerik üreticilerini seçtiğiniz performans metriğine göre sıralar."
+        )
+
+        sponsor_filter = st.selectbox(
+            "İşbirliği / Reklam Filtresi",
+            options=[
+                "Tümü (Filtresiz)",
+                "Yalnızca İşbirliği Yapmış Hesaplar",
+                "Yalnızca Organik (İşbirliksiz)"
+            ],
+            index=0,
+            help="Önceden ticari işbirliği/reklam yapmış hesapları ayıklar."
+        )
+
     st.sidebar.markdown("---")
     st.sidebar.subheader("🔑 API Durumu")
     import os
@@ -132,5 +157,7 @@ def render_sidebar() -> Dict[str, Any]:
         "min_followers": min_followers,
         "max_followers": max_followers if max_followers > 0 else None,
         "country": country if country != "Hepsi" else None,
-        "language": language if language != "Hepsi" else None
+        "language": language if language != "Hepsi" else None,
+        "sort_by": sort_by,
+        "sponsor_filter": sponsor_filter
     }

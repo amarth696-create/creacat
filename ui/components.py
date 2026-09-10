@@ -31,19 +31,38 @@ def render_creator_card(creator: Any) -> None:
             warn_text = inactivity_warn or f"Bu profil 2 aydan uzun süredir yeni içerik üretmemiştir (Son paylaşım: {last_post or 'belirsiz'})."
             st.warning(f"⚠️ **İnaktif Profil Uyarısı:** {warn_text}")
             
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
             st.metric("Takipçi", f"{followers:,}")
         with col2:
-            st.metric("Etkileşim Oranı", f"%{eng_rate:.2f}")
+            st.metric("Etkileşim", f"%{eng_rate:.2f}")
         with col3:
+            v_views = getattr(creator, "avg_video_views", 0) or 0
+            st.metric("📺 Yatay İzlenme", f"{v_views:,}" if v_views > 0 else "Belirsiz")
+        with col4:
+            s_views = getattr(creator, "avg_shorts_views", 0) or 0
+            st.metric("📱 Shorts İzlenme", f"{s_views:,}" if s_views > 0 else "Belirsiz")
+        with col5:
             st.metric("Uygunluk Skoru", f"{score:.1f}/100")
             
-        if is_active:
-            last_info = f" • Son İçerik: {last_post}" if last_post else ""
-            st.caption(f"🟢 **Hesap Durumu:** Aktif Üretici • Herkese Açık (Public){last_info}")
-        else:
-            st.caption(f"⚠️ **Hesap Durumu:** İnaktif (2+ aydır içerik yok) • Son İçerik: {last_post or 'Bilinmiyor'}")
+        has_sp = getattr(creator, "has_sponsored_content", False)
+        sp_cnt = getattr(creator, "sponsored_video_count", 0)
+        sp_kws = getattr(creator, "sponsor_keywords_found", [])
+        
+        col_status, col_sponsor = st.columns(2)
+        with col_status:
+            if is_active:
+                last_info = f" • Son İçerik: {last_post}" if last_post else ""
+                st.caption(f"🟢 **Hesap Durumu:** Aktif Üretici • Herkese Açık{last_info}")
+            else:
+                st.caption(f"⚠️ **Hesap Durumu:** İnaktif (2+ ay) • Son İçerik: {last_post or 'Bilinmiyor'}")
+                
+        with col_sponsor:
+            if has_sp:
+                kw_str = f" ({', '.join(sp_kws[:3])})" if sp_kws else ""
+                st.caption(f"🤝 **İşbirliği Durumu:** Ticari İşbirliği Yapmış ({sp_cnt} video){kw_str}")
+            else:
+                st.caption("🌿 **İşbirliği Durumu:** Organik İçerik (İşbirliği/Reklam Görülmedi)")
             
         bio = getattr(creator, "bio", "") or "Bilgi yok"
         st.write("📝 **Hakkında (Bio):**", bio[:250] + ("..." if len(bio) > 250 else ""))
@@ -85,13 +104,20 @@ def render_results_table(creators: List[Any], depth: int = 1) -> None:
         is_active = getattr(c, "is_active", True)
         last_post = getattr(c, "last_post_date", "-") or "-"
         
+        has_sp = getattr(c, "has_sponsored_content", False)
+        sp_cnt = getattr(c, "sponsored_video_count", 0)
+        v_views = getattr(c, "avg_video_views", 0) or 0
+        s_views = getattr(c, "avg_shorts_views", 0) or 0
+        
         item = {
             "#": i,
             "Kullanıcı Adı": getattr(c, "username", ""),
             "Platform": get_platform_name(c),
             "Aktivite": "🟢 Aktif" if is_active else "⚠️ İnaktif (2+ ay)",
-            "Son Paylaşım": last_post,
             "Takipçi": getattr(c, "followers", 0) or 0,
+            "Yatay İzlenme": f"{v_views:,}" if v_views > 0 else "-",
+            "Shorts İzlenme": f"{s_views:,}" if s_views > 0 else "-",
+            "İşbirliği": f"🤝 Var ({sp_cnt})" if has_sp else "🌿 Organik",
             "Etkileşim (%)": round(getattr(c, "engagement_rate", 0.0) or 0.0, 2),
             "Skor": round(getattr(c, "final_score", 0.0) or getattr(c, "score", 0.0) or 0.0, 1),
             "Profil URL": getattr(c, "profile_url", "")
@@ -133,12 +159,18 @@ def render_download_buttons(creators: List[Any], keyword: str) -> None:
     records = []
     for c in creators:
         ca = getattr(c, "content_analysis", None)
+        has_sp = getattr(c, "has_sponsored_content", False)
+        sp_cnt = getattr(c, "sponsored_video_count", 0)
         records.append({
             "Kullanıcı Adı": getattr(c, "username", ""),
             "Platform": get_platform_name(c),
             "Aktivite Durumu": "Aktif" if getattr(c, "is_active", True) else "İnaktif (2+ aydır içerik yok)",
             "Son Paylaşım": getattr(c, "last_post_date", "-") or "-",
             "Takipçi": getattr(c, "followers", 0) or 0,
+            "Yatay Video Ort. İzlenme": getattr(c, "avg_video_views", 0) or 0,
+            "Shorts Ort. İzlenme": getattr(c, "avg_shorts_views", 0) or 0,
+            "İşbirliği / Reklam Var mı": "Evet" if has_sp else "Hayır",
+            "Tespit Edilen İşbirliği Sayısı": sp_cnt,
             "Etkileşim Oranı (%)": getattr(c, "engagement_rate", 0.0) or 0.0,
             "Skor": getattr(c, "final_score", 0.0) or getattr(c, "score", 0.0) or 0.0,
             "Bio": getattr(c, "bio", ""),

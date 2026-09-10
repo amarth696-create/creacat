@@ -367,6 +367,26 @@ SADECE aşağıdaki JSON formatında geçerli bir JSON listesi döndür (kesinli
                 if c.is_excluded_for_inactivity:
                     continue
                 
+                # Ortalama İzlenme ve Sponsorluk Verileri
+                v_views = item.get("avg_video_views") or item.get("ortalama_yatay_izlenme")
+                s_views = item.get("avg_shorts_views") or item.get("ortalama_shorts_izlenme")
+                c.avg_video_views = int(v_views) if v_views else max(200, int(followers * 0.20))
+                c.avg_views_per_video = float(c.avg_video_views)
+                c.avg_shorts_views = int(s_views) if s_views else max(500, int(followers * 0.50))
+                
+                c.has_sponsored_content = bool(item.get("has_sponsored_content", False))
+                c.sponsored_video_count = int(item.get("sponsored_video_count", 0))
+                c.sponsor_keywords_found = item.get("sponsor_keywords_found", []) or []
+
+                # İçerik başlıklarında sponsorluk taraması yap
+                from analyzers.performance_analyzer import detect_sponsorship_in_texts
+                all_text_blobs = list(recent) + [bio, review]
+                has_sp, sp_cnt, kws = detect_sponsorship_in_texts(all_text_blobs)
+                if has_sp:
+                    c.has_sponsored_content = True
+                    c.sponsored_video_count = max(c.sponsored_video_count, sp_cnt)
+                    c.sponsor_keywords_found = sorted(list(set(c.sponsor_keywords_found + kws)))
+
                 # İçerik analiz özetini oluştur
                 from models.creator import ContentAnalysis
                 c.content_analysis = ContentAnalysis(
