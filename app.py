@@ -26,6 +26,9 @@ from processors.filterer import Filterer
 from analyzers.analysis_orchestrator import AnalysisOrchestrator
 
 from processors.expander import KeywordExpander
+from auth.auth_manager import AuthManager
+from auth.login_ui import render_login_screen
+from ai.chat_storage import ChatStorage
 
 st.set_page_config(
     page_title="İçerik Üretici Keşif Sistemi",
@@ -215,15 +218,37 @@ def execute_search(params, settings):
 
 def main():
     init_session_state()
+
+    # 1. GİRİŞ KONTROLÜ (LOGIN GATE)
+    if not AuthManager.is_authenticated():
+        render_login_screen()
+        return
+
+    # 2. OTURUM AÇILDIYSA YAN MENÜYÜ VE AYARLARI ÇALIŞTIR
+    current_user = AuthManager.get_current_user()
     settings = render_sidebar()
-    
+
+    # 3. AKTİF SOHBETİN YÖNETİMİ
+    active_chat_id = st.session_state.get("active_chat_id")
+    if not active_chat_id and current_user:
+        # Mevcut sohbetleri kontrol et
+        user_convs = ChatStorage.get_user_conversations(current_user["email"])
+        if user_convs:
+            active_chat_id = user_convs[0]["id"]
+        else:
+            active_chat_id = ChatStorage.create_conversation(current_user["email"], title="Yeni Sohbet")
+        st.session_state["active_chat_id"] = active_chat_id
+        st.session_state["chat_history"] = ChatStorage.get_messages(active_chat_id)
+
     st.title("🗣️ İçerik Üretici Keşif Asistanı")
     st.caption("TikTok, Instagram ve YouTube üzerinde konulara göre içerik üreticilerini bulun ve analiz edin.")
     
     bot = ChatBot(Config.GEMINI_API_KEY)
     conv = ConversationManager()
     
-    for msg in get_state("chat_history"):
+    # 4. AKTİF SOHBETİN MESAJLARINI GÖSTER
+    chat_history = get_state("chat_history") or []
+    for msg in chat_history:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
             if "results" in msg and msg["results"]:
@@ -233,17 +258,27 @@ def main():
                 for c in msg["results"]:
                     render_creator_card(c)
             
+    # 5. KULLANICI GİRDİSİ VE CEVAP ÜRETİMİ
     prompt = st.chat_input("Hangi konuda influencer arıyorsunuz?")
     if prompt:
         with st.chat_message("user"):
             st.markdown(prompt)
             
-        existing_history = get_state("chat_history")
+        existing_history = get_state("chat_history") or []
         response = bot.process_message(prompt, settings, history=existing_history)
         
+        # Kullanıcı mesajını yerel state'e ve veritabanına kaydet
+        user_msg = {"role": "user", "content": prompt}
         history = list(existing_history)
-        history.append({"role": "user", "content": prompt})
+        history.append(user_msg)
         set_state("chat_history", history)
+        
+        if active_chat_id:
+            ChatStorage.add_message(active_chat_id, "user", prompt)
+            # İlk kullanıcı mesajıysa sohbet başlığını güncelle
+            if len(existing_history) == 0:
+                short_title = prompt[:30] + ("..." if len(prompt) > 30 else "")
+                ChatStorage.update_conversation_title(active_chat_id, short_title)
         
         with st.chat_message("assistant"):
             results = None
@@ -277,12 +312,17 @@ def main():
                 st.markdown(response["text"])
                 saved_content = response["text"]
             
-            history = get_state("chat_history")
-            msg_data = {"role": "assistant", "content": saved_content}
+            # Asistan cevabını yerel state'e ve veritabanına kaydet
+            assistant_msg = {"role": "assistant", "content": saved_content}
             if results:
-                msg_data["results"] = results
-            history.append(msg_data)
+                assistant_msg["results"] = results
+            
+            history = get_state("chat_history")
+            history.append(assistant_msg)
             set_state("chat_history", history)
+            
+            if active_chat_id:
+                ChatStorage.add_message(active_chat_id, "assistant", saved_content, results=results)
 
 if __name__ == "__main__":
     main()

@@ -1,80 +1,105 @@
 import streamlit as st
 from typing import Dict, Any
+from auth.auth_manager import AuthManager
+from ai.chat_storage import ChatStorage
 
 def render_sidebar() -> Dict[str, Any]:
-    """Yan menüyü oluşturur ve seçilen ayarları döner."""
-    st.sidebar.title("🔍 İçerik Üretici Keşif Sistemi")
-    st.sidebar.markdown("---")
+    """Yan menüyü oluşturur: Kullanıcı bilgisi, Gemini tarzı Sohbet Listesi ve Arama Ayarları."""
     
-    st.sidebar.subheader("Arama Ayarları")
+    # 1. KULLANICI PROFİLİ VE ÇIKIŞ YAP
+    current_user = AuthManager.get_current_user()
+    if current_user:
+        st.sidebar.markdown(f"👤 **{current_user['name']}** (`{current_user['email']}`)")
+        if st.sidebar.button("🚪 Çıkış Yap", use_container_width=True, key="btn_logout"):
+            AuthManager.logout()
+            st.rerun()
+        st.sidebar.markdown("---")
     
-    platforms = st.sidebar.multiselect(
-        "Platformlar",
-        options=["YouTube", "TikTok", "Instagram"],
-        default=["YouTube", "TikTok", "Instagram"],
-        help="Arama yapılacak platformları seçin."
-    )
-    
-    # Analiz derinliği varsayılan olarak her zaman maksimum (3) seviyededir
-    depth = 3
-    st.sidebar.caption("⚡ **Analiz Seviyesi:** Maksimum (Derin AI Analizi)")
+    # 2. GEMINI TARZI YENİ SOHBET BUTONU
+    if st.sidebar.button("➕ Yeni Sohbet Başlat", type="primary", use_container_width=True, key="btn_new_chat"):
+        if current_user:
+            new_id = ChatStorage.create_conversation(current_user["email"], title="Yeni Sohbet")
+            st.session_state["active_chat_id"] = new_id
+            st.session_state["chat_history"] = []
+            st.rerun()
 
-    
-    min_followers = st.sidebar.number_input(
-        "Minimum Takipçi",
-        min_value=0,
-        value=1000,
-        step=1000,
-        help="Minimum takipçi sayısını belirleyin."
-    )
-    
-    max_followers = st.sidebar.number_input(
-        "Maksimum Takipçi (0 = Sınırsız)",
-        min_value=0,
-        value=0,
-        step=10000,
-        help="Maksimum takipçi sınırı. 0 bırakılırsa üst sınır uygulanmaz."
-    )
-    
-    country = st.sidebar.selectbox(
-        "Ülke",
-        options=["Hepsi", "Türkiye", "ABD", "Almanya", "İngiltere", "Fransa"],
-        index=0
-    )
-    
-    language = st.sidebar.selectbox(
-        "Dil",
-        options=["Hepsi", "Türkçe", "İngilizce", "Almanca"],
-        index=0
-    )
-    
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📜 Geçmiş Aramalar")
-    
-    try:
-        import sqlite3
-        from config import Config
-        import os
-        if os.path.exists(Config.DB_PATH):
-            conn = sqlite3.connect(Config.DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, keyword, created_at FROM search_sessions ORDER BY created_at DESC LIMIT 5")
-            rows = cursor.fetchall()
-            conn.close()
-            
-            if rows:
-                for row in rows:
-                    session_id, kw, dt_str = row
-                    date_display = dt_str[:10] if dt_str else ""
-                    if st.sidebar.button(f"🔍 {kw} ({date_display})", key=f"hist_{session_id}"):
-                        st.session_state["selected_history_kw"] = kw
+    # 3. SOHBET GEÇMİŞİ LİSTESİ (GEMINI / CHATGPT TARZI)
+    st.sidebar.subheader("💬 Sohbet Geçmişi")
+    if current_user:
+        conversations = ChatStorage.get_user_conversations(current_user["email"])
+        active_id = st.session_state.get("active_chat_id")
+        
+        # Eğer henüz aktif bir sohbet yoksa sonuncuyu seç veya yeni aç
+        if not active_id and conversations:
+            active_id = conversations[0]["id"]
+            st.session_state["active_chat_id"] = active_id
+            st.session_state["chat_history"] = ChatStorage.get_messages(active_id)
+        
+        if conversations:
+            for conv in conversations[:12]:
+                c_id = conv["id"]
+                title = conv["title"] or "Yeni Sohbet"
+                is_active = (c_id == active_id)
+                prefix = "👉 " if is_active else "💭 "
+                display_label = f"{prefix}{title}"
+                
+                col_btn, col_del = st.sidebar.columns([5, 1])
+                with col_btn:
+                    if st.button(display_label, key=f"conv_{c_id}", use_container_width=True):
+                        st.session_state["active_chat_id"] = c_id
+                        st.session_state["chat_history"] = ChatStorage.get_messages(c_id)
                         st.rerun()
-            else:
-                st.sidebar.caption("Henüz kayıtlı arama yok.")
+                with col_del:
+                    if st.button("🗑️", key=f"del_{c_id}", help="Bu sohbeti sil"):
+                        ChatStorage.delete_conversation(c_id)
+                        if st.session_state.get("active_chat_id") == c_id:
+                            st.session_state["active_chat_id"] = None
+                            st.session_state["chat_history"] = []
+                        st.rerun()
         else:
-            st.sidebar.caption("Henüz kayıtlı arama yok.")
-    except Exception:
-        st.sidebar.caption("Arama geçmişi yüklenemedi.")
+            st.sidebar.caption("Henüz kayıtlı bir sohbetiniz yok.")
+            
+    st.sidebar.markdown("---")
+    
+    # 4. ARAMA AYARLARI
+    with st.sidebar.expander("⚙️ Arama & Platform Filtreleri", expanded=True):
+        platforms = st.multiselect(
+            "Platformlar",
+            options=["YouTube", "TikTok", "Instagram"],
+            default=["YouTube", "TikTok", "Instagram"],
+            help="Arama yapılacak platformları seçin."
+        )
+        
+        depth = 3
+        st.caption("⚡ **Analiz Seviyesi:** Maksimum (Derin AI Analizi)")
+        
+        min_followers = st.number_input(
+            "Minimum Takipçi",
+            min_value=0,
+            value=1000,
+            step=1000,
+            help="Minimum takipçi sayısını belirleyin."
+        )
+        
+        max_followers = st.number_input(
+            "Maksimum Takipçi (0 = Sınırsız)",
+            min_value=0,
+            value=0,
+            step=10000,
+            help="Maksimum takipçi sınırı. 0 bırakılırsa üst sınır uygulanmaz."
+        )
+        
+        country = st.selectbox(
+            "Ülke",
+            options=["Hepsi", "Türkiye", "ABD", "Almanya", "İngiltere", "Fransa"],
+            index=0
+        )
+        
+        language = st.selectbox(
+            "Dil",
+            options=["Hepsi", "Türkçe", "İngilizce", "Almanca"],
+            index=0
+        )
 
     st.sidebar.markdown("---")
     st.sidebar.subheader("🔑 API Durumu")
